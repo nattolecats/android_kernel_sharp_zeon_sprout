@@ -1,0 +1,83 @@
+/*
+ * Copyright (c) 2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/****************************************/
+/* pmi632_charger						*/
+/****************************************/
+&pmi632_charger {
+	qcom,fcc-max-ua = <1900000>;
+	qcom,fv-max-uv = <4350000>;
+	qcom,usb-icl-ua = <3000000>;
+	qcom,otg-cl-ua = <1000000>;
+	qcom,thermal-mitigation = <3000000 1500000 1400000 1200000 1100000 1000000 900000 700000 600000 500000 400000 300000 0>;
+	qcom,float-option = <2>;
+	qcom,auto-recharge-soc = <90>;
+	/delete-property/ qcom,step-charging-enable;
+	qcom,sw-jeita-enable;
+	/delete-property/ qcom,hw-die-temp-mitigation;
+	/delete-property/ qcom,hw-connector-mitigation;
+	qcom,connector-internal-pull-kohm = <100>;
+	qcom,shdiag-fv-max-uv = <4020000>;
+	qcom,typec-safety-therm-ch = <0x54>;
+	qcom,typec-safety-trigger-threshold = <55>;
+	qcom,typec-safety-cancel-threshold = <45>;
+};
+
+/****************************************/
+/* pmi632_qg							*/
+/****************************************/
+&pmi632_qg {
+	qcom,vbatt-empty-mv = <3100>;
+	qcom,vbatt-empty-cold-mv = <3000>;
+	qcom,vbatt-cutoff-mv = <3350>;
+	qcom,qg-iterm-ma = <150>;
+	qcom,hold-soc-while-full;
+	qcom,linearize-soc;
+	/delete-property/ qcom,cl-disable;
+	qcom,cl-feedback-on;
+	qcom,cl-max-start-soc = <40>;
+	qcom,cl-min-start-soc = <5>;
+	qcom,cl-min-temp = <150>;
+	qcom,cl-max-temp = <450>;
+	qcom,cl-max-increment = <20>;
+	qcom,cl-max-decrement = <20>;
+	/delete-property/ qcom,esr-disable;
+	qcom,esr-discharge-enable;
+	qcom,empty-soc-silver-freq-khz = <1036800>;
+	qcom,empty-soc-gold-freq-khz = <1036800>;
+};
+
+/****************************************/
+/* thermal_zones						*/
+/****************************************/
+&thermal_zones {
+	pmi-vbat-lvl0 {
+		trips {
+			vbat-lvl0 {
+				temperature = <3400>;
+				hysteresis = <200>;
+				type = "passive";
+			};
+		};
+	};
+
+	soc {
+		trips {
+			low-soc {
+				temperature = <5>;
+				hysteresis = <0>;
+				type = "passive";
+			};
+		};
+	};
+};

@@ -1,0 +1,453 @@
+/*
+ * Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*****************************************/
+/*  Add SHARP include                    */
+/*****************************************/
+
+/*****************************************/
+/*  pm8953: qcom,pm8953 alias            */
+/*****************************************/
+&spmi_bus {
+	qcom,pm8953@0 {
+		qcom,power-on@800 {
+			qcom,pon_1 {
+			};
+
+			qcom,pon_2 {
+				linux,code = <115>;
+			};
+		};
+	};
+};
+/*****************************************/
+/*  pm8953-gpios: qpnp-pin               */
+/*****************************************/
+&pm8953_gpios {
+//	compatible = "qcom,spmi-gpio";
+//	reg = <0xc000 0x800>;
+
+//	interrupts = <0x0 0xc0 0 IRQ_TYPE_NONE>,
+//		<0x0 0xc1 0 IRQ_TYPE_NONE>,
+////		<0x0 0xc2 0 IRQ_TYPE_NONE>,
+//		<0x0 0xc3 0 IRQ_TYPE_NONE>,
+//		<0x0 0xc4 0 IRQ_TYPE_NONE>,
+//		<0x0 0xc5 0 IRQ_TYPE_NONE>,
+//		<0x0 0xc6 0 IRQ_TYPE_NONE>,
+//		<0x0 0xc7 0 IRQ_TYPE_NONE>;
+//	interrupt-names = "pm8953_gpio1",
+//					"pm8953_gpio2",
+////					"pm8953_gpio3",
+//					"pm8953_gpio4",
+//					"pm8953_gpio5",
+//					"pm8953_gpio6",
+//					"pm8953_gpio7",
+//					"pm8953_gpio8";
+
+//	gpio-controller;
+//	#gpio-cells = <2>;
+//	qcom,gpios-disallowed = <3>;
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pm8953_gpio1_default
+				&pm8953_gpio2_default
+//				&pm8953_gpio3_default
+				&pm8953_gpio4_default
+				&pm8953_gpio5_default
+				&pm8953_gpio6_default
+				&pm8953_gpio7_default
+				&pm8953_gpio8_default>;
+
+	pm8953_gpio1_pinctrl {
+		/* I/PD/L */	/* Not used */
+		pm8953_gpio1_default: pm8953_gpio1_default {
+			pins = "gpio1";			/* GPIO 1 */
+			function = "normal";	/* normal input */
+			bias-pull-down;			/* pull down */
+			power-source = <0>;		/* VIN0 */
+			input-enable;			/* digital input */
+		};
+	};
+
+	pm8953_gpio2_pinctrl {
+		/* I/PD/L */	/* Not used */
+		pm8953_gpio2_default: pm8953_gpio2_default {
+			pins = "gpio2";			/* GPIO 2 */
+			function = "normal";	/* normal input */
+			bias-pull-down;			/* pull down */
+			power-source = <0>;		/* VIN0 */
+			input-enable;			/* digital input */
+		};
+	};
+
+//	pm8953_gpio3_pinctrl {
+//		/* I/PD/L */	/* UIM_BATT_ALARM */
+//		pm8953_gpio3_default: pm8953_gpio3_default {
+//			pins = "gpio3";			/* GPIO 3 */
+//			function = "func1";		/* function 1 */
+//			bias-pull-down;			/* pull down */
+//			power-source = <0>;		/* VIN0 */
+//			input-enable;			/* digital input */
+//		};
+//	};
+
+	pm8953_gpio4_pinctrl {
+		/* O/NP/L */	/* LCD_BL_EN */
+		pm8953_gpio4_default: pm8953_gpio4_default {
+			pins = "gpio4";				/* GPIO 4 */
+			function = "normal";		/* normal output */
+			bias-disable;				/* No Pull */
+			power-source = <3>;			/* VIN3 */
+			qcom,drive-strength = <1>;	/* Low strength */
+		};
+	};
+
+	pm8953_gpio5_pinctrl {
+		/* I/PD/L */	/* Not used */
+		pm8953_gpio5_default: pm8953_gpio5_default {
+			pins = "gpio5";			/* GPIO 5 */
+			function = "normal";	/* normal input */
+			bias-pull-down;			/* pull down */
+			power-source = <3>;		/* VIN3 */
+			input-enable;			/* digital input */
+		};
+	};
+
+	pm8953_gpio6_pinctrl {
+		/* I/PD/L */	/* Not used */
+		pm8953_gpio6_default: pm8953_gpio6_default {
+			pins = "gpio6";			/* GPIO 6 */
+			function = "normal";	/* normal input */
+			bias-pull-down;			/* pull down */
+			power-source = <3>;		/* VIN3 */
+			input-enable;			/* digital input */
+		};
+	};
+
+	pm8953_gpio7_pinctrl {
+		/* I/PD/L */	/* Not used */
+		pm8953_gpio7_default: pm8953_gpio7_default {
+			pins = "gpio7";			/* GPIO 7 */
+			function = "normal";	/* normal input */
+			bias-pull-down;			/* pull down */
+			power-source = <3>;		/* VIN3 */
+			input-enable;			/* digital input */
+		};
+	};
+
+	pm8953_gpio8_pinctrl {
+		/* O/NP/L */	/* LCM_BL_PWM */
+		pm8953_gpio8_default: pm8953_gpio8_default {
+			pins = "gpio8";		/* GPIO 8 */
+			function = "normal";	/* normal output */
+			bias-disable;			/* No Pull */
+			power-source = <3>;		/* VIN3 */
+			output-low;				/* digital output, no invert */
+			qcom,drive-strength = <1>;	/* Low strength */
+		};
+	};
+
+};
+
+&pm8953_mpps {
+//	compatible = "qcom,spmi-mpp";
+//	reg = <0xa000 0x400>;
+
+//	interrupts = <0x0 0xa1 0 IRQ_TYPE_NONE>,
+//		<0x0 0xa3 0 IRQ_TYPE_NONE>;
+//	interrupt-names = "pm8953_mpp2",
+//					"pm8953_mpp4";
+
+//	gpio-controller;
+//	#gpio-cells = <2>;
+//	qcom,gpios-disallowed = <1 3>;
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pm8953_mpp2_in_default
+				&pm8953_camera_therm_default>;
+
+	pm8953_mpp2_in {
+		/* I/PD/L */	/* Not used */
+		pm8953_mpp2_in_default: pm8953_mpp2_in_default {
+			pins = "mpp2";			/* MPP 2 */
+			function = "digital";	/* digital input */
+			power-source = <3>;		/* VIN3 */
+			input-enable;			/* input */
+		};
+	};
+
+	pm8953_camera_therm {
+		/* I/NP/Z */	/* CAMERA_THERM */
+		pm8953_camera_therm_default: pm8953_camera_therm_default {
+			pins = "mpp4";			/* MPP 4 */
+			function = "analog";	/* analog input */
+			power-source = <3>;		/* VIN3 */
+			input-enable;			/* input */
+		};
+	};
+};
+
+/*****************************************/
+/*  pm8953-mpps: qpnp-pin                */
+/*****************************************/
+
+/*****************************************/
+/*  pm8953: rpm-regulator                */
+/*****************************************/
+&pm8953_l1{	/* 8953_l1 */
+};
+&pm8953_l2{	/* 8953_l2 */
+	/* - */
+//	regulator-always-on;
+	qcom,pull-down-enable = <1>;
+//	qcom,auto-mode-enable = <0>;
+	regulator-min-microvolt = <1100000>;
+	regulator-max-microvolt = <1100000>;
+	qcom,init-voltage = <1100000>;
+	qcom,init-ldo-mode = <1>;
+	status = "disabled";
+};
+&pm8953_l3{	/* 8953_l3 */
+};
+//&pm8953_l4{	/* 8953_l4 */
+//};
+&pm8953_l5{	/* 8953_l5 */
+};
+&pm8953_l6{	/* 8953_l6 */
+};
+&pm8953_l7{	/* 8953_l7 */
+};
+&pm8953_l8{	/* 8953_l8 */
+	/* eMMC_VCCM */
+	regulator-always-on;
+	qcom,pull-down-enable = <1>;
+//	qcom,auto-mode-enable = <0>;
+	regulator-min-microvolt = <2900000>;
+	regulator-max-microvolt = <2900000>;
+	qcom,init-voltage = <2900000>;
+	qcom,init-ldo-mode = <1>;
+	status = "okay";
+};
+&pm8953_l9{	/* 8953_l9 */
+};
+&pm8953_l10{	/* 8953_l10 */
+	/* - */
+//	regulator-always-on;
+	qcom,pull-down-enable = <1>;
+//	qcom,auto-mode-enable = <0>;
+	regulator-min-microvolt = <3000000>;
+	regulator-max-microvolt = <3000000>;
+	qcom,init-voltage = <3000000>;
+	qcom,init-ldo-mode = <1>;
+	status = "disabled";
+};
+&pm8953_l11{	/* 8953_l11 */
+	/* Proxy & Ambient lig ht sensor */
+//	regulator-always-on;
+	qcom,pull-down-enable = <1>;
+//	qcom,auto-mode-enable = <0>;
+	regulator-min-microvolt = <2950000>;
+	regulator-max-microvolt = <2950000>;
+	qcom,init-voltage = <2950000>;
+	qcom,init-ldo-mode = <1>;
+	status = "okay";
+};
+&pm8953_l12{	/* 8953_l12 */
+};
+&pm8953_l13{	/* 8953_l13 */
+};
+//&pm8953_l14{	/* 8953_l14 */
+//};
+//&pm8953_l15{	/* 8953_l15 */
+//};
+&pm8953_l16{	/* 8953_l16 */
+};
+&pm8953_l17{	/* 8953_l17 */
+	/* CAM_AF_Motor Driver */
+//	regulator-always-on;
+	qcom,pull-down-enable = <1>;
+//	qcom,auto-mode-enable = <0>;
+	regulator-min-microvolt = <2800000>;
+	regulator-max-microvolt = <2800000>;
+	qcom,init-voltage = <2800000>;
+	qcom,init-ldo-mode = <1>;
+	status = "okay";
+};
+//&pm8953_l18{	/* 8953_l18 */
+//};
+&pm8953_l19{	/* 8953_l19 */
+};
+//&pm8953_l20{	/* 8953_l20 */
+//};
+//&pm8953_l21{	/* 8953_l21 */
+//};
+&pm8953_l22{	/* 8953_l22 */
+	/* Fingerprint sensor #1.8V */
+//	regulator-always-on;
+	qcom,pull-down-enable = <1>;
+//	qcom,auto-mode-enable = <0>;
+	regulator-min-microvolt = <1800000>;
+	regulator-max-microvolt = <1800000>;
+	qcom,init-voltage = <1800000>;
+	qcom,init-ldo-mode = <1>;
+	status = "disabled";
+};
+&pm8953_l23{	/* 8953_l23 */
+	/* Camera_digital */
+//	regulator-always-on;
+	qcom,pull-down-enable = <1>;
+//	qcom,auto-mode-enable = <0>;
+	qcom,bypass-mode-enable = <1>;
+	regulator-min-microvolt = <1225000>;
+	regulator-max-microvolt = <1225000>;
+	qcom,init-voltage = <1225000>;
+	qcom,init-ldo-mode = <0>;
+	parent-supply = <&pm8953_s3>;
+	status = "okay";
+};
+/*****************************************/
+/*  qpnp-adc-voltage                     */
+/*****************************************/
+&pm8953_vadc {
+
+	chan@8 {
+		label = "die_temp";
+		reg = <8>;
+		qcom,decimation = <0>;
+		qcom,pre-div-channel-scaling = <0>;
+		qcom,calibration-type = "absolute";
+		qcom,scale-function = <2>;
+		qcom,hw-settle-time = <2>;
+		qcom,fast-avg-setup = <0>;
+		qcom,vadc-thermal-node;
+	};
+
+	chan@36 {
+		label = "pa_therm1";
+		reg = <0x36>;
+		qcom,decimation = <0>;
+		qcom,pre-div-channel-scaling = <0>;
+		qcom,calibration-type = "ratiometric";
+		qcom,scale-function = <2>;
+		qcom,hw-settle-time = <2>;
+		qcom,fast-avg-setup = <0>;
+		qcom,vadc-thermal-node;
+	};
+
+	chan@32 {
+		label = "xo_therm";
+		reg = <0x32>;
+		qcom,decimation = <0>;
+		qcom,pre-div-channel-scaling = <0>;
+		qcom,calibration-type = "ratiometric";
+		qcom,scale-function = <4>;
+		qcom,hw-settle-time = <2>;
+		qcom,fast-avg-setup = <0>;
+//		qcom,vadc-thermal-node;
+	};
+
+	chan@13 {
+		label = "cam_therm";
+		reg = <0x13>;
+		qcom,decimation = <0>;
+		qcom,pre-div-channel-scaling = <0>;
+		qcom,calibration-type = "ratiometric";
+		qcom,scale-function = <2>;
+		qcom,hw-settle-time = <2>;
+		qcom,fast-avg-setup = <0>;
+		qcom,vadc-thermal-node;
+	};
+
+};
+/*****************************************/
+/*  qpnp-vadc-tm                         */
+/*****************************************/
+&pm8953_adc_tm{
+	chan@32 {
+		label = "xo_therm";
+		reg = <0x32>;
+		qcom,pre-div-channel-scaling = <0>;
+		qcom,decimation = <0>;
+		qcom,calibration-type = "ratiometric";
+		qcom,scale-function = <4>;
+		qcom,hw-settle-time = <2>;
+		qcom,fast-avg-setup = <0>;
+		qcom,btm-channel-number = <0x68>;
+		qcom,thermal-node;
+	};
+};
+/*****************************************/
+/*  thermal_zones                        */
+/*****************************************/
+&thermal_zones {
+
+	die_temp {
+		polling-delay-passive = <0>;
+		polling-delay = <0>;
+		thermal-sensors = <&pm8953_vadc 0x8>;
+		thermal-governor = "user_space";
+
+		trips {
+			active-config0 {
+				temperature = <65000>;
+				hysteresis = <1000>;
+				type = "passive";
+			};
+		};
+	};
+
+	cam_therm {
+		polling-delay-passive = <0>;
+		polling-delay = <0>;
+		thermal-sensors = <&pm8953_vadc 0x13>;
+		thermal-governor = "user_space";
+
+		trips {
+			active-config0 {
+				temperature = <65000>;
+				hysteresis = <1000>;
+				type = "passive";
+			};
+		};
+	};
+
+	pa_therm1 {
+		polling-delay-passive = <0>;
+		polling-delay = <0>;
+		thermal-sensors = <&pm8953_vadc 0x36>;
+		thermal-governor = "user_space";
+
+		trips {
+			active-config0 {
+				temperature = <65000>;
+				hysteresis = <5000>;
+				type = "passive";
+			};
+		};
+	};
+
+};
+
+/*****************************************/
+/*  SHARP Device Drivers                 */
+/*****************************************/
+&soc {
+	/*---------------------------------------*/
+	/*  Battery Control Driver               */
+	/*---------------------------------------*/
+	sharp,shbatt {
+		compatible = "sharp,shbatt";
+		sharp,cl-high-thresh = <45>;
+		sharp,cl-low-thresh = <45>;
+		status = "ok";
+	};
+};

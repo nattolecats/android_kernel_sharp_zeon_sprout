@@ -1,0 +1,28 @@
+#
+# Near Field Communication (NFC) devices
+#
+
+menu "CXD225X NFC Chip Driver Support"
+
+config NFC_CXD225X
+	tristate "CXD225X NFC driver"
+
+	depends on I2C
+	select CRC_CCITT
+	default n
+	---help---
+	  Say yes if you want cxd225x Near Field Communication driver.
+	  This is for i2c connected version. If unsure, say N here.
+
+	  To compile this driver as a module, choose m here. The module will
+	  be called cxd225x-i2c.
+
+config NFC_CXD225X_PROBE_RST
+	bool "CXD225X PROBE RST"
+	default n
+
+config NFC_CXD225X_RST_USE_PMIC
+	bool "CXD225X RST USE PMIC"
+	default n
+
+endmenu

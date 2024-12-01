@@ -1,0 +1,255 @@
+/*
+ * Copyright (c) 2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/*****************************************/
+/*  Add SHARP include                    */
+/*****************************************/
+#include "sharp_pinctrl/sharp-pinctrl-sdm450.dtsi"
+#include "pmic/sharp-pm8953.dtsi"
+#include "pmic/sharp-pmi632.dtsi"
+#include "storage/sharp-sdm450-sdcc.dtsi"
+#include "smdread/sharp-sdm450-smd_read.dtsi"
+#include "nfc/sharp-sdm450-nfc.dtsi"
+
+
+/*----------------------------------------*/
+/* Qualcomm settings.                     */
+/*----------------------------------------*/
+
+/ {
+	fragment@00000000 {
+
+		target-path = "/reserved-memory";
+
+		__overlay__ {
+			#address-cells = <2>;
+			#size-cells = <2>;
+			ranges;
+
+			/*----------------------------------------------*/
+			/* shrlog                                       */
+			/*----------------------------------------------*/
+
+			shrlog_region: shrlog_region@91500000 {
+				compatible = "removed-dma-pool";
+				no-map;
+				reg = <0x0 0x91500000 0x0 0x100000>;
+				label = "shrlog_region";
+			};
+			ramoops_region: ramoops_region@91400000 {
+				compatible = "ramoops";
+				reg = <0x0 0x91400000 0x0 0x040000>;
+				console-size = <0x10000>;
+				record-size = <0x10000>;
+				pmsg-size = <0x20000>;
+				ftrace-size = <0x0>;
+				ecc-size = <0x0>;
+			};
+		};
+	};
+};
+
+&firmware {
+    android {
+        fstab {
+            odm {
+                compatible = "android,odm";
+                dev = "/dev/block/platform/soc/7824900.sdhci/by-name/odm";
+                type = "ext4";
+                mnt_flags = "ro,barrier=1,discard";
+                fsmgr_flags = "wait";
+                status = "ok";
+            };
+            product {
+                compatible = "android,product";
+                dev = "/dev/block/platform/soc/7824900.sdhci/by-name/product";
+                type = "ext4";
+                mnt_flags = "ro,barrier=1,discard";
+                fsmgr_flags = "wait";
+                status = "ok";
+            };
+        };
+    };
+};
+
+/*----------------------------------------*/
+/* Add SHARP settings.                    */
+/*----------------------------------------*/
+/*------------------------------*/
+/*  BLSP#1                      */
+/*------------------------------*/
+/* NOT USE */
+
+
+/*------------------------------*/
+/*  BLSP#2                      */
+/*------------------------------*/
+/* SH_AUDIO_DRIVER -> */ /*A-001*/
+&i2c_2 {
+	status = "disabled";
+};
+/* SH_AUDIO_DRIVER <- */ /*A-001*/
+
+/*------------------------------*/
+/*  BLSP#3 (I2C)                */
+/*------------------------------*/
+/* BLSP1 QUP3 */
+&i2c_3 {
+	qcom,clk-freq-out = <400000>;	/* 400KHz */
+	pinctrl-0 = <&blsp_i2c_3_active>;
+	pinctrl-1 = <&blsp_i2c_3_sleep>;
+	status = "disabled";
+};
+
+
+/*------------------------------*/
+/*  BLSP#4 (I2C)                */
+/*------------------------------*/
+/* can be accessed from ADSP */
+
+
+/*------------------------------*/
+/*  BLSP#5 (I2C)                */
+/*------------------------------*/
+/* BLSP2 QUP1 */
+&i2c_5 {
+	qcom,clk-freq-out = <400000>;	/* 400KHz */
+	pinctrl-0 = <&blsp_i2c_5_active>;
+	pinctrl-1 = <&blsp_i2c_5_sleep>;
+	status = "disabled";
+};
+
+/delete-node/ &nq_nci;
+
+/*------------------------------*/
+/*  BLSP#6 (SPI)                */
+/*------------------------------*/
+/* can be accessed from ADSP */
+
+
+/*------------------------------*/
+/*  BLSP#7                      */
+/*------------------------------*/
+/* NOT USE */
+
+
+/*------------------------------*/
+/*  BLSP#8                      */
+/*------------------------------*/
+/* NOT USE */
+
+
+/*----------------------------------------*/
+/* Audio Driver.                          */
+/*----------------------------------------*/
+/* SH_AUDIO_DRIVER -> */ /*A-001*/
+&int_codec {
+	qcom,model = "msm8953-snd-card-anakis";
+	status = "okay";
+	qcom,msm-mbhc-hphl-swh = <1>;
+	sharp,jack-lineout-report = "notsend";
+	qcom,audio-routing =
+			"RX_BIAS", "MCLK",
+			"SPK_RX_BIAS", "MCLK",
+			"INT_LDO_H", "MCLK",
+			"RX_I2S_CLK", "MCLK",
+			"TX_I2S_CLK", "MCLK",
+			"MIC BIAS External", "Handset Mic",
+			"MIC BIAS Internal2", "Headset Mic",
+			"AMIC1", "MIC BIAS External",
+			"AMIC2", "MIC BIAS Internal2",
+			"ADC1_IN", "ADC1_OUT",
+			"ADC2_IN", "ADC2_OUT",
+			"PDM_IN_RX1", "PDM_OUT_RX1",
+			"PDM_IN_RX2", "PDM_OUT_RX2",
+			"PDM_IN_RX3", "PDM_OUT_RX3";
+};
+
+&pmic_analog_codec{
+	qcom,cdc-micbias-cfilt-mv = <2700000>;
+};
+
+&wsa881x_analog_vi_gpio{
+	status = "disabled";
+};
+
+&wsa881x_analog_clk_gpio{
+	status = "disabled";
+};
+
+&wsa881x_analog_reset_gpio{
+	status = "disabled";
+};
+
+&cdc_us_euro_sw{
+	status = "disabled";
+};
+
+&cdc_quin_mi2s_gpios{
+	status = "disabled";
+};
+/* SH_AUDIO_DRIVER <- */ /*A-001*/
+
+/*----------------------------------------------*/
+/* gpio_keys                                    */
+/*----------------------------------------------*/
+&gpio_keys {
+	/delete-property/ pinctrl-names;
+	/delete-property/ pinctrl-0;
+	/delete-property/ pinctrl-1;
+
+	/delete-node/ camera_focus;
+	/delete-node/ camera_snapshot;
+	/delete-node/ vol_up;
+
+	vol_down {
+		label = "volume_down";
+		gpios = <&tlmm 85 0x1>;
+		linux,input-type = <1>;
+		linux,code = <114>;
+		gpio-key,wakeup;
+		debounce-interval = <15>;
+	};
+};
+
+&soc {
+	/*----------------------------------------------*/
+	/* shrlog                                       */
+	/*----------------------------------------------*/
+	sharp,shrlog {
+		compatible = "sharp,shrlog";
+		memory-region = <&shrlog_region>;
+		sharp,shrlog-offset = <0x0>;
+		sharp,shrlog-linux-offset = <0x0>;
+		sharp,aboot-log-region = <&shrlog_region>;
+		sharp,shrlog-abootlog-offset = <0x0>;
+		sharp,disable-sdi-on-boot;
+	};
+
+};
+
+/* SH_USB_DRIVER -> */
+&qusb_phy {
+	qcom,qusb-phy-init-seq = <0xf8 0x80
+				0x33 0x84
+				0x83 0x88
+				0xcf 0x8c
+				0x14 0x9c
+				0x30 0x08
+				0x79 0x0c
+				0x21 0x10
+				0x00 0x90
+				0x9f 0x1c
+				0x00 0x18>;
+};
+/* SH_USB_DRIVER <- */

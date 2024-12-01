@@ -1,0 +1,257 @@
+/*
+ * Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+/*****************************************/
+/*  Add SHARP include                    */
+/*****************************************/
+#include "sharp-chg-param-pmi632.dtsi"
+
+/*****************************************/
+/*  pmi632-gpios: qpnp-pin               */
+/*****************************************/
+&pmi632_gpios {
+//	compatible = "qcom,spmi-gpio";
+//	reg = <0xc000 0x800>;
+//	interrupts = <0x2 0xc0 0 IRQ_TYPE_NONE>,
+//			<0x2 0xc1 0 IRQ_TYPE_NONE>,
+//			<0x2 0xc2 0 IRQ_TYPE_NONE>,
+//			<0x2 0xc3 0 IRQ_TYPE_NONE>,
+////			<0x2 0xc4 0 IRQ_TYPE_NONE>,
+//			<0x2 0xc5 0 IRQ_TYPE_NONE>,
+//			<0x2 0xc6 0 IRQ_TYPE_NONE>,
+//			<0x2 0xc7 0 IRQ_TYPE_NONE>;
+//	interrupt-names = "pmi632_gpio1",
+//					"pmi632_gpio2",
+//					"pmi632_gpio3",
+//					"pmi632_gpio4",
+////					"pmi632_gpio5",
+//					"pmi632_gpio6",
+//					"pmi632_gpio7",
+//					"pmi632_gpio8";
+
+//	gpio-controller;
+//	#gpio-cells = <2>;
+//	qcom,gpios-disallowed = <5>;
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pmi632_gpio1_default
+				&pmi632_gpio2_default
+				&pmi632_gpio3_default
+				&pmi632_gpio4_default
+//				&pmi632_gpio5_default
+				&pmi632_gpio6_default
+				&pmi632_gpio7_default
+				&pmi632_gpio8_default>;
+
+	pmi632_gpio1_pinctrl {
+		/* I/NP/- */	/* Temprature monitor around SDM450 */
+		pmi632_gpio1_default: pmi632_gpio1_default {
+			pins = "gpio1";			/* GPIO 1 */
+			function = "normal";	/* normal */
+			bias-high-impedance;	/* DISABLE GPIO1 for ADC */
+		};
+	};
+
+	pmi632_gpio2_pinctrl {
+		/* I/PD/L */	/* Not Used */
+		pmi632_gpio2_default: pmi632_gpio2_default {
+			pins = "gpio2";			/* GPIO 2 */
+			function = "normal";	/* normal input */
+			bias-pull-down;			/* pull down */
+			input-enable;			/* digital input */
+			power-source = <1>;		/* VIN1 */
+		};
+	};
+
+	pmi632_gpio3_pinctrl {
+		/* I/NP/- */	/* Tempreture monitor around SDM450 */
+		pmi632_gpio3_default: pmi632_gpio3_default {
+			pins = "gpio3";			/* GPIO 3 */
+			function = "normal";	/* normal */
+			bias-high-impedance;	/* DISABLE GPIO3 for ADC */
+		};
+	};
+
+	pmi632_gpio4_pinctrl {
+		/* I/NP/- */	/* Tempreture monitor around USB Type-C */
+		pmi632_gpio4_default: pmi632_gpio4_default {
+			pins = "gpio4";			/* GPIO 4 */
+			function = "normal";	/* normal */
+			bias-high-impedance;	/* DISABLE GPIO4 for ADC */
+		};
+	};
+
+//	pmi632_gpio5_pinctrl {
+//		/* I/NP/Z(L) */	/* Input for Flash light strobe signal */
+//		pmi632_gpio5_default: pmi632_gpio5_default {
+//			pins = "gpio5";			/* GPIO 5 */
+//			function = "normal";	/* normal input */
+//			bias-disable;			/* no pull */
+//			power-source = <1>;		/* VIN1 */
+//		};
+//	};
+
+	pmi632_gpio6_pinctrl {
+		/* I/PD/L */	/* Reseve Linner vib driver PWM */
+		pmi632_gpio6_default: pmi632_gpio6_default {
+			pins = "gpio6";			/* GPIO 6 */
+			function = "normal";	/* normal input */
+			bias-pull-down;			/* pull down */
+			input-enable;			/* digital input */
+			power-source = <1>;		/* VIN1 */
+		};
+	};
+
+	pmi632_gpio7_pinctrl {
+		/* I/PD/L */	/* not used */
+		pmi632_gpio7_default: pmi632_gpio7_default {
+			pins = "gpio7";			/* GPIO 7 */
+			function = "normal";	/* normal input */
+			bias-pull-down;			/* pull down */
+			input-enable;			/* digital input */
+			power-source = <1>;		/* VIN1 */
+		};
+	};
+
+	pmi632_gpio8_pinctrl {
+		/* I/PD/L */	/* not used */
+		pmi632_gpio8_default: pmi632_gpio8_default {
+			pins = "gpio8";			/* GPIO 8 */
+			function = "normal";	/* normal input */
+			bias-pull-down;			/* pull down */
+			input-enable;			/* digital input */
+			power-source = <1>;		/* VIN1 */
+		};
+	};
+
+};
+
+/*****************************************/
+/* pmi632_charger */
+/*****************************************/
+&pmi632_charger {
+	qcom,battery-data = <&mtp_batterydata>;
+};
+/*****************************************/
+/* pmi632_qg */
+/*****************************************/
+&pmi632_qg {
+  qcom,battery-data = <&mtp_batterydata>;
+};
+/*****************************************/
+/*  qpnp-adc-voltage                     */
+/*****************************************/
+&pmi632_vadc {
+	#thermal-sensor-cells = <1>;
+
+	chan@4a {
+		label = "bat_therm";
+		reg = <0x4a>;
+		qcom,decimation = <2>;
+		qcom,pre-div-channel-scaling = <0>;
+		qcom,calibration-type = "ratiometric";
+		qcom,scale-function = <50>;
+		qcom,hw-settle-time = <0xB>;
+		qcom,fast-avg-setup = <0>;
+		qcom,cal-val = <0>;
+	};
+
+	chan@52 {
+		label = "msm_therm";
+		reg = <0x52>;
+		qcom,decimation = <2>;
+		qcom,pre-div-channel-scaling = <0>;
+		qcom,calibration-type = "ratiometric";
+		qcom,scale-function = <2>;
+		qcom,hw-settle-time = <0>;
+		qcom,fast-avg-setup = <0>;
+		qcom,cal-val = <0>;
+		qcom,vadc-thermal-node;
+	};
+	chan@53 {
+		label = "lcd_therm";
+		reg = <0x53>;
+		qcom,decimation = <2>;
+		qcom,pre-div-channel-scaling = <0>;
+		qcom,calibration-type = "ratiometric";
+		qcom,scale-function = <2>;
+		qcom,hw-settle-time = <0>;
+		qcom,fast-avg-setup = <0>;
+		qcom,cal-val = <0>;
+		qcom,vadc-thermal-node;
+	};
+
+	chan@54 {
+		label = "usb_therm";
+		reg = <0x54>;
+		qcom,decimation = <2>;
+		qcom,pre-div-channel-scaling = <0>;
+		qcom,calibration-type = "ratiometric";
+		qcom,scale-function = <2>;
+		qcom,hw-settle-time = <0>;
+		qcom,fast-avg-setup = <0>;
+		qcom,cal-val = <0>;
+		qcom,vadc-thermal-node;
+	};
+};
+
+/*****************************************/
+/*  thermal_zones                        */
+/*****************************************/
+&thermal_zones {
+
+	msm_therm {
+		polling-delay-passive = <0>;
+		polling-delay = <0>;
+		thermal-sensors = <&pmi632_vadc 0x52>;
+		thermal-governor = "user_space";
+
+		trips {
+			active-config0 {
+				temperature = <65000>;
+				hysteresis = <1000>;
+				type = "passive";
+			};
+		};
+	};
+
+	lcd_therm {
+		polling-delay-passive = <0>;
+		polling-delay = <0>;
+		thermal-sensors = <&pmi632_vadc 0x53>;
+		thermal-governor = "user_space";
+
+		trips {
+			active-config0 {
+				temperature = <65000>;
+				hysteresis = <1000>;
+				type = "passive";
+			};
+		};
+	};
+
+	usb_therm {
+		polling-delay-passive = <0>;
+		polling-delay = <0>;
+		thermal-sensors = <&pmi632_vadc 0x54>;
+		thermal-governor = "user_space";
+
+		trips {
+			active-config0 {
+				temperature = <65000>;
+				hysteresis = <1000>;
+				type = "passive";
+			};
+		};
+	};
+
+};

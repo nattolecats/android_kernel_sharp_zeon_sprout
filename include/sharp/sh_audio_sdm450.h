@@ -1,0 +1,4 @@
+#ifndef SH_AUDIO_SDM450_FOR_SENSOR_H
+#define SH_AUDIO_SDM450_FOR_SENSOR_H
+
+#endif

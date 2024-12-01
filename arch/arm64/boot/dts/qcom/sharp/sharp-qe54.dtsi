@@ -1,0 +1,131 @@
+/*
+ * Copyright (c) 2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/*****************************************/
+/*  Add SHARP include                    */
+/*****************************************/
+#include "sharp_pinctrl/sharp-pinctrl-qe54.dtsi"
+#include "shdisp/sharp-shdisp-anasui.dtsi"
+#include "vib/sharp-anasui-vib.dtsi"
+#include "pmic/sharp-pm8953-anasui.dtsi"
+#include "pmic/sharp-pmi632-anasui.dtsi"
+
+/*----------------------------------------*/
+/* Qualcomm settings.                     */
+/*----------------------------------------*/
+
+&firmware {
+    android {
+        fstab {
+            odm {
+                fsmgr_flags = "wait,slotselect,avb";
+            };
+            vendor {
+                fsmgr_flags = "wait,slotselect,avb";
+            };
+            product {
+                fsmgr_flags = "wait,slotselect,avb";
+            };
+            system {
+                status = "disabled";
+            };
+        };
+        vbmeta {
+            parts = "vbmeta,boot,system,vendor,dtbo";
+        };
+    };
+};
+
+
+/*----------------------------------------*/
+/* Add BLSP settings.                     */
+/*----------------------------------------*/
+/*------------------------------*/
+/*  BLSP#1                      */
+/*------------------------------*/
+/* NOT USE */
+
+
+/*------------------------------*/
+/*  BLSP#2                      */
+/*------------------------------*/
+/* NOT USE */
+
+
+/*------------------------------*/
+/*  BLSP#3 (I2C)                */
+/*------------------------------*/
+&i2c_3 {
+	status = "ok";
+	qcom,clk-freq-out = <400000>;	/* default: 400000 */
+	synaptics_tcm@2c {
+		status = "ok";
+		compatible = "synaptics,tcm-i2c";
+		reg = <0x2c>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <65 0x2008>;
+		// vdd-supply = <&pm660_l11>;
+		// avdd-supply = <&pm660_l11>;
+		pinctrl-names = "syna_tcm_int_active", "syna_tcm_int_standby";
+		pinctrl-0 = <&syna_tcm_int_active>;
+		pinctrl-1 = <&syna_tcm_int_standby>;
+		// synaptics,bus-reg-name = "vdd";
+		// synaptics,pwr-reg-name = "avdd";
+		synaptics,irq-gpio = <&tlmm 65 0x2008>; /* IRQF_ONESHOT | IRQF_TRIGGER_LOW */
+		synaptics,irq-on-state = <0>;
+		// synaptics,reset-gpio = <&tlmm 64 0x0000>;
+		synaptics,reset-on-state = <0>;
+		synaptics,reset-active-ms = <20>;
+		synaptics,reset-delay-ms = <200>;
+		synaptics,power-delay-ms = <200>;
+		synaptics,ubl-i2c-addr = <0x2c>;
+	};
+};
+
+
+/*------------------------------*/
+/*  BLSP#4 (I2C)                */
+/*------------------------------*/
+/* can be accessed from ADSP */
+
+
+/*------------------------------*/
+/*  BLSP#5 (I2C)                */
+/*------------------------------*/
+&i2c_5 {
+	status = "disabled";
+};
+
+
+/*------------------------------*/
+/*  BLSP#6 (SPI)                */
+/*------------------------------*/
+/* can be accessed from ADSP */
+
+
+/*------------------------------*/
+/*  BLSP#7                      */
+/*------------------------------*/
+/* NOT USE */
+
+
+/*------------------------------*/
+/*  BLSP#8                      */
+/*------------------------------*/
+/* NOT USE */
+
+
+/*----------------------------------------*/
+/* Add SHARP settings.                    */
+/*----------------------------------------*/
+#include "camera/sharp-anasui-camera-sensor.dtsi"

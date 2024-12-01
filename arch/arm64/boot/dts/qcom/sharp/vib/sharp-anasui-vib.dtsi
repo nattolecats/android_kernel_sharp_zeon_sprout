@@ -1,0 +1,23 @@
+/* Copyright (c) 2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+&spmi_bus {
+	pmi632_3: qcom,pmi632@3 {
+		pmi632_vib: qcom,vibrator@5700 {
+			compatible = "qcom,qpnp-vibrator-ldo";
+			reg = <0x5700 0x100>;
+			qcom,vib-ldo-volt-uv = <2700000>;
+			qcom,vib-overdrive-volt-uv = <3544000>;
+			qcom,disable-overdrive;
+		};
+	};
+};

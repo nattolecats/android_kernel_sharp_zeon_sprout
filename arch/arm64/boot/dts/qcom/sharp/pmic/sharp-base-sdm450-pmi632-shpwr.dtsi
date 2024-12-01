@@ -1,0 +1,50 @@
+/*
+ * Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+// only write down delete-node/property for mainDTS
+/****************************************/
+/* pmi632_charger						*/
+/****************************************/
+&pmi632_charger {
+	/delete-property/ qcom,step-charging-enable;
+	/delete-property/ qcom,hw-die-temp-mitigation;
+	/delete-property/ qcom,hw-connector-mitigation;
+};
+
+/****************************************/
+/* pmi632_qg							*/
+/****************************************/
+&pmi632_qg {
+	/delete-property/ qcom,cl-disable;
+	/delete-property/ qcom,esr-disable;
+};
+
+/*****************************************/
+/*  qpnp-adc-voltage                     */
+/*****************************************/
+&pm8953_vadc {
+	/delete-node/ chan@11;
+};
+
+&pa_therm1_default{
+	/delete-property/function;
+	/delete-property/input-enable;
+	/delete-property/qcom,amux-route;
+};
+
+/*****************************************/
+/*  thermal_zones                        */
+/*****************************************/
+&thermal_zones {
+	/delete-node/ pa-therm0;
+};

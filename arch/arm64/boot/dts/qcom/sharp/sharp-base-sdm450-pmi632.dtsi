@@ -1,0 +1,106 @@
+/*
+ * Copyright (c) 2018, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/*****************************************/
+/* alieas                                */
+/*****************************************/
+/ {
+	aliases {
+	};
+};
+
+
+/*****************************************/
+/* Add SHARP BLSP node                   */
+/*****************************************/
+&soc {
+	/*------------------------------*/
+	/*  BLSP#1                      */
+	/*------------------------------*/
+	/* NOT USE */
+
+
+	/*------------------------------*/
+	/*  BLSP#2                      */
+	/*------------------------------*/
+	/* NOT USE */
+
+
+	/*------------------------------*/
+	/*  BLSP#3 (I2C)                */
+	/*------------------------------*/
+	/* BLSP1 QUP3 */
+
+
+	/*------------------------------*/
+	/*  BLSP#4 (I2C)                */
+	/*------------------------------*/
+	/* can be accessed from ADSP */
+
+
+	/*------------------------------*/
+	/*  BLSP#5 (I2C)                */
+	/*------------------------------*/
+	/* BLSP2 QUP1 */
+
+
+	/*------------------------------*/
+	/*  BLSP#6 (SPI)                */
+	/*------------------------------*/
+	/* can be accessed from ADSP */
+
+
+	/*------------------------------*/
+	/*  BLSP#7                      */
+	/*------------------------------*/
+	/* NOT USE */
+
+
+	/*------------------------------*/
+	/*  BLSP#8                      */
+	/*------------------------------*/
+	/* NOT USE */
+
+
+};
+
+
+/*****************************************/
+/* Delete Qualcomm node/property         */
+/*****************************************/
+/*----------------------------------------*/
+/* Audio Driver.                          */
+/*----------------------------------------*/
+/* SH_AUDIO_DRIVER -> */ /*A-001*/
+&int_codec {
+	/delete-property/ qcom,cdc-us-euro-gpios;
+	/delete-property/ qcom,cdc-us-eu-gpios;
+	/delete-property/ qcom,quin-mi2s-gpios;
+
+	/delete-property/ asoc-wsa-codec-names;
+	/delete-property/ asoc-wsa-codec-prefixes;
+	/delete-property/ msm-vdd-wsa-switch-supply;
+	/delete-property/ qcom,msm-vdd-wsa-switch-voltage;
+	/delete-property/ qcom,msm-vdd-wsa-switch-current;
+};
+/* SH_AUDIO_DRIVER <- */ /*A-001*/
+
+
+/*****************************************/
+/* Add SHARP Include                     */
+/*****************************************/
+/* SHARP_DISPLAY start */
+#include "shdisp/sharp-base-anasui-shdisp.dtsi"
+/* SHARP_DISPLAY end */
+
+#include "pmic/sharp-base-sdm450-pmi632-shpwr.dtsi"

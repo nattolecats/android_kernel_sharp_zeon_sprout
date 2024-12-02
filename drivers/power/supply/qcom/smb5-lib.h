@@ -77,30 +77,16 @@ enum print_reason {
 #define BOOST_BACK_STORM_COUNT	3
 #define WEAK_CHG_STORM_COUNT	8
 
-#ifdef CONFIG_BATTERY_SHARP
-#define SHDIAG_MODE_VOTER	"SHDIAG_MODE_VOTER"
-#define SHPWR_JEITA_VOTER	"SHPWR_JEITA_VOTER"
-#define CC_SHORT_VOTER		"CC_SHORT_VOTER"
-#define USB_OVERHEAT_VOTER	"USB_OVERHEAT_VOTER"
-#endif /* CONFIG_BATTERY_SHARP */
-
 #define VBAT_TO_VRAW_ADC(v)		div_u64((u64)v * 1000000UL, 194637UL)
 
 #define SDP_100_MA			100000
 #define SDP_CURRENT_UA			500000
 #define CDP_CURRENT_UA			1500000
 #define DCP_CURRENT_UA			1500000
-#ifdef CONFIG_BATTERY_SHARP
-#define HVDCP_CURRENT_UA		1500000
-#else
 #define HVDCP_CURRENT_UA		3000000
-#endif /* CONFIG_BATTERY_SHARP */
 #define TYPEC_DEFAULT_CURRENT_UA	900000
 #define TYPEC_MEDIUM_CURRENT_UA		1500000
 #define TYPEC_HIGH_CURRENT_UA		3000000
-#ifdef CONFIG_BATTERY_SHARP
-#define REBERSE_BOOST_CHECK_CURRENT_UA	30000
-#endif /* CONFIG_BATTERY_SHARP */
 
 enum smb_mode {
 	PARALLEL_MASTER = 0,
@@ -132,19 +118,6 @@ enum {
 	RERUN_AICL			= BIT(0),
 	RESTART_AICL			= BIT(1),
 };
-
-#ifdef CONFIG_BATTERY_SHARP
-enum {
-	USBIN_CURRENT,
-	USBIN_VOLTAGE,
-};
-
-enum {
-	STORMING_SWITCHER_POWER_OK,
-	STORMING_USBIN_UV,
-	NUM_STORMING,
-};
-#endif /* CONFIG_BATTERY_SHARP */
 
 enum smb_irq_index {
 	/* CHGR */
@@ -374,9 +347,6 @@ struct smb_charger {
 	struct votable		*chg_disable_votable;
 	struct votable		*pl_enable_votable_indirect;
 	struct votable		*usb_irq_enable_votable;
-#ifdef CONFIG_BATTERY_SHARP
-	struct votable		*cc_disable_votable;
-#endif /* CONFIG_BATTERY_SHARP */
 
 	/* work */
 	struct work_struct	bms_update_work;
@@ -476,30 +446,6 @@ struct smb_charger {
 	u32			headroom_mode;
 	bool			flash_init_done;
 	bool			flash_active;
-
-#ifdef CONFIG_BATTERY_SHARP
-	int			thermal_control_disable;
-	int			set_usb_icl_enable;
-	struct mutex			batt_status_lock;
-	struct delayed_work		typec_usb_therm_work;
-	struct qpnp_vadc_chip	*pm_vadc_dev;
-	bool			typec_short_detected;
-	bool			typec_usb_overheat;
-	bool			prev_typec_usb_overheat;
-	int				cc_safety_level;
-	int				fake_cc_safety_level;
-	bool			offcharge_mode;
-	bool			is_storming[NUM_STORMING];
-	bool			jeita_en_hot_sl_fcv;
-	bool			jeita_en_cold_sl_fcv;
-	bool			jeita_en_hot_sl_ccc;
-	bool			jeita_en_cold_sl_ccc;
-	int			typec_safety_therm_ch;
-	int			typec_safety_trigger_threshold;
-	int			typec_safety_cancel_threshold;
-	struct delayed_work		reverse_boost_work;
-	int				aicl_threshold_voter_current;
-#endif /* CONFIG_BATTERY_SHARP */
 };
 
 int smblib_read(struct smb_charger *chg, u16 addr, u8 *val);
@@ -563,18 +509,10 @@ int smblib_get_prop_batt_capacity(struct smb_charger *chg,
 				union power_supply_propval *val);
 int smblib_get_prop_batt_status(struct smb_charger *chg,
 				union power_supply_propval *val);
-#ifdef CONFIG_BATTERY_SHARP
-int sh_smblib_get_prop_batt_status(struct smb_charger *chg,
-				union power_supply_propval *val);
-#endif /* CONFIG_BATTERY_SHARP */
 int smblib_get_prop_batt_charge_type(struct smb_charger *chg,
 				union power_supply_propval *val);
 int smblib_get_prop_batt_charge_done(struct smb_charger *chg,
 				union power_supply_propval *val);
-#ifdef CONFIG_BATTERY_SHARP
-int smblib_get_prop_batt_charger_error_status(struct smb_charger *chg,
-				union power_supply_propval *val);
-#endif /* CONFIG_BATTERY_SHARP */
 int smblib_get_prop_batt_health(struct smb_charger *chg,
 				union power_supply_propval *val);
 int smblib_get_prop_system_temp_level(struct smb_charger *chg,
@@ -583,10 +521,6 @@ int smblib_get_prop_system_temp_level_max(struct smb_charger *chg,
 				union power_supply_propval *val);
 int smblib_get_prop_input_current_limited(struct smb_charger *chg,
 				union power_supply_propval *val);
-#ifdef CONFIG_BATTERY_SHARP
-int smblib_get_prop_batt_current_avg(struct smb_charger *chg,
-				union power_supply_propval *val);
-#endif /* CONFIG_BATTERY_SHARP */
 int smblib_set_prop_input_suspend(struct smb_charger *chg,
 				const union power_supply_propval *val);
 int smblib_set_prop_batt_capacity(struct smb_charger *chg,
@@ -668,12 +602,6 @@ int smblib_configure_wdog(struct smb_charger *chg, bool enable);
 int smblib_force_vbus_voltage(struct smb_charger *chg, u8 val);
 int smblib_configure_hvdcp_apsd(struct smb_charger *chg, bool enable);
 int smblib_icl_override(struct smb_charger *chg, bool override);
-
-#ifdef CONFIG_BATTERY_SHARP
-int smblib_typec_disable_cmd_set(struct smb_charger *chg, bool disable);
-int smblib_get_usb_therm(struct smb_charger *chg, int *usb_therm);
-int smb5_get_adc_data(struct smb_charger *chg, int channel, union power_supply_propval *val);
-#endif /* CONFIG_BATTERY_SHARP */
 
 int smblib_init(struct smb_charger *chg);
 int smblib_deinit(struct smb_charger *chg);

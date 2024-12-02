@@ -540,8 +540,4 @@ static inline void page_key_write(void *address) {}
 
 #endif /* !CONFIG_ARCH_SAVE_PAGE_KEYS */
 
-#ifdef CONFIG_SHARP_PNP_SLEEP_DEBUG
-extern void print_active_locks(void);
-#endif /* CONFIG_SHARP_PNP_SLEEP_DEBUG */
-
 #endif /* _LINUX_SUSPEND_H */

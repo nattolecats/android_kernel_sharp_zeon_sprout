@@ -22,7 +22,3 @@
 	qcom,pmic-id = <0x010016 0x25 0x0 0x0>;
 	qcom,pmic-name = "PMI632";
 };
-
-/* SH_BSP_CUST Add Start */
-#include "sharp/sharp-base-sdm450-pmi632.dtsi"
-/* SH_BSP_CUST Add End */

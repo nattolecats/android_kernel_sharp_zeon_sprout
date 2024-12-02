@@ -44,16 +44,6 @@ struct mmc_ioc_cmd {
 	/* DAT buffer */
 	__u64 data_ptr;
 };
-
-#ifdef CONFIG_SHARP_MMC_EMMC_FFU
-struct mmc_ioc_ffu {
-	unsigned char version[8];
-	unsigned int sector;
-	unsigned int __pad;
-	unsigned char* data_ptr;
-};
-#endif /* CONFIG_SHARP_MMC_EMMC_FFU */
-
 #define mmc_ioc_cmd_set_data(ic, ptr) ic.data_ptr = (__u64)(unsigned long) ptr
 
 /**
@@ -68,11 +58,6 @@ struct mmc_ioc_multi_cmd {
 };
 
 #define MMC_IOC_CMD _IOWR(MMC_BLOCK_MAJOR, 0, struct mmc_ioc_cmd)
-
-#ifdef CONFIG_SHARP_MMC_EMMC_FFU
-#define MMC_IOC_FFU _IOW(MMC_BLOCK_MAJOR, 99, struct mmc_ioc_ffu)
-#endif /* CONFIG_SHARP_MMC_EMMC_FFU */
-
 /*
  * MMC_IOC_MULTI_CMD: Used to send an array of MMC commands described by
  *	the structure mmc_ioc_multi_cmd. The MMC driver will issue all

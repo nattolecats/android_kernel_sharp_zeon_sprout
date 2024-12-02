@@ -190,19 +190,8 @@ struct msm_actuator_move_params_t32 {
 	int16_t dest_step_pos;
 	int32_t num_steps;
 	uint16_t curr_lens_pos;
-/* SHLOCAL_CAMERA_DRIVERS-> */
-	uint16_t setting;
-/* SHLOCAL_CAMERA_DRIVERS<- */
 	compat_uptr_t ringing_params;
 };
-
-/* SHLOCAL_CAMERA_DRIVERS-> */
-struct i2c_info_t32 {
-	uint32_t addr;
-	uint32_t length;
-	compat_uptr_t data;
-};
-/* SHLOCAL_CAMERA_DRIVERS<- */
 
 struct msm_actuator_cfg_data32 {
 	int cfgtype;
@@ -213,9 +202,6 @@ struct msm_actuator_cfg_data32 {
 		struct msm_actuator_get_info_t get_info;
 		struct msm_actuator_set_position_t setpos;
 		enum af_camera_name cam_name;
-/* SHLOCAL_CAMERA_DRIVERS-> */
-		struct i2c_info_t32 i2c_info;
-/* SHLOCAL_CAMERA_DRIVERS<- */
 	} cfg;
 };
 
@@ -227,14 +213,6 @@ struct csiphy_cfg_data32 {
 	} cfg;
 };
 
-/* SHLOCAL_CAMERA_DRIVERS-> */
-struct smem_info_t32 {
-	uint32_t addr;
-	uint32_t length;
-	compat_uptr_t data;
-};
-/* SHLOCAL_CAMERA_DRIVERS<- */
-
 struct sensorb_cfg_data32 {
 	int cfgtype;
 	union {
@@ -242,10 +220,6 @@ struct sensorb_cfg_data32 {
 		struct msm_sensor_init_params sensor_init_params;
 		compat_uptr_t                 setting;
 		struct msm_sensor_i2c_sync_params sensor_i2c_sync_params;
-/* SHLOCAL_CAMERA_DRIVERS-> */
-		struct smem_info_t32          smem_info;
-		struct ois_pram_t             ois_pram;
-/* SHLOCAL_CAMERA_DRIVERS<- */
 	} cfg;
 };
 
@@ -288,16 +262,6 @@ struct msm_flash_cfg_data_t32 {
 		compat_uptr_t settings;
 	} cfg;
 };
-
-/* SHLOCAL_CAMERA_DRIVERS-> */
-struct msm_camera_i2c_read_config32 {
-	uint16_t slave_addr;
-	uint16_t reg_addr;
-	enum msm_camera_i2c_reg_addr_type addr_type;
-	enum msm_camera_i2c_data_type data_type;
-	compat_uptr_t data;
-};
-/* SHLOCAL_CAMERA_DRIVERS<- */
 
 #define VIDIOC_MSM_ACTUATOR_CFG32 \
 	_IOWR('V', BASE_VIDIOC_PRIVATE + 6, struct msm_actuator_cfg_data32)

@@ -3434,9 +3434,6 @@ panel_events:
 	ctl->ops.remove_vsync_handler = NULL;
 	ctl->ops.reconfigure = NULL;
 	ctl->ops.wait_for_vsync_fnc = NULL;
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00019 */
-	ctl->ops.config_mipiclk_fnc = NULL;
-#endif /* CONFIG_SHARP_DISPLAY */
 
 end:
 	if (!IS_ERR_VALUE((unsigned long)ret)) {

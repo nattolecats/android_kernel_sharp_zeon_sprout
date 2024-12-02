@@ -52,18 +52,12 @@ struct cap_learning {
 	int64_t			final_cap_uah;
 	int64_t			learned_cap_uah;
 	bool			active;
-#ifdef CONFIG_BATTERY_SHARP
-	bool			stored_learned_capacity;
-#endif /* CONFIG_BATTERY_SHARP */
 	struct mutex		lock;
 	struct cl_params	dt;
 	int (*get_learned_capacity)(void *data, int64_t *learned_cap_uah);
 	int (*store_learned_capacity)(void *data, int64_t learned_cap_uah);
 	int (*get_cc_soc)(void *data, int *cc_soc_sw);
 	int (*prime_cc_soc)(void *data, u32 cc_soc_sw);
-#ifdef CONFIG_BATTERY_SHARP
-	int (*power_supply_changed)(void *data);
-#endif /* CONFIG_BATTERY_SHARP */
 };
 
 enum ttf_mode {

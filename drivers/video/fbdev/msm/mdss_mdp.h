@@ -353,11 +353,6 @@ struct mdss_mdp_ctl_intfs_ops {
 
 	/* to wait for vsync */
 	int (*wait_for_vsync_fnc)(struct mdss_mdp_ctl *ctl);
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00019 */
-	int (*config_mipiclk_fnc)(struct mdss_mdp_ctl *,
-					struct mdp_mipi_clkchg_param *);
-#endif /* CONFIG_SHARP_DISPLAY */
 };
 
 /* FRC info used for Deterministic Frame Rate Control */
@@ -658,12 +653,6 @@ struct mdss_mdp_ctl {
 	/* vsync handler for FRC */
 	struct mdss_mdp_vsync_handler frc_vsync_handler;
 	bool need_vsync_on;
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00011 *//* CUST_ID_00019 */
-	bool mipiclk_pending;
-	struct mdp_mipi_clkchg_param request_mipiclk;
-	struct mutex mipiclk_lock;
-#endif /* CONFIG_SHARP_DISPLAY */
 };
 
 struct mdss_mdp_mixer {
@@ -1929,9 +1918,6 @@ int mdss_mdp_calib_config(struct mdp_calib_config_data *cfg, u32 *copyback);
 int mdss_mdp_calib_config_buffer(struct mdp_calib_config_buffer *cfg,
 						u32 *copyback);
 int mdss_mdp_ctl_update_fps(struct mdss_mdp_ctl *ctl);
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00019 */
-int mdss_mdp_ctl_update_mipiclk(struct mdss_mdp_ctl *ctl);
-#endif /* CONFIG_SHARP_DISPLAY */
 int mdss_mdp_pipe_is_staged(struct mdss_mdp_pipe *pipe);
 int mdss_mdp_writeback_display_commit(struct mdss_mdp_ctl *ctl, void *arg);
 struct mdss_mdp_ctl *mdss_mdp_ctl_mixer_switch(struct mdss_mdp_ctl *ctl,

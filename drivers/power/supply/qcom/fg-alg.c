@@ -22,11 +22,7 @@
 
 #define FULL_SOC_RAW		255
 #define FULL_BATT_SOC		GENMASK(31, 0)
-#ifdef CONFIG_BATTERY_SHARP
-#define CAPACITY_DELTA_DECIPCT	700
-#else /* CONFIG_BATTERY_SHARP */
 #define CAPACITY_DELTA_DECIPCT	500
-#endif /* CONFIG_BATTERY_SHARP */
 
 #define CENTI_ICORRECT_C0	105
 #define CENTI_ICORRECT_C1	20
@@ -368,10 +364,6 @@ static void cap_learning_post_process(struct cap_learning *cl)
 			pr_err("Error in storing learned_cap_uah, rc=%d\n", rc);
 	}
 
-#ifdef CONFIG_BATTERY_SHARP
-	cl->stored_learned_capacity = true;
-#endif /* CONFIG_BATTERY_SHARP */
-
 	pr_debug("final cap_uah = %lld, learned capacity %lld -> %lld uah\n",
 		cl->final_cap_uah, old_cap, cl->learned_cap_uah);
 }
@@ -400,11 +392,7 @@ static int cap_learning_process_full_data(struct cap_learning *cl)
 			cl->cc_soc_max);
 
 	/* If the delta is < 50%, then skip processing full data */
-#ifdef CONFIG_BATTERY_SHARP
-	if (cc_soc_delta_centi_pct < 3000) {
-#else
 	if (cc_soc_delta_centi_pct < 5000) {
-#endif /* CONFIG_BATTERY_SHARP */
 		pr_err("cc_soc_delta_centi_pct: %d\n", cc_soc_delta_centi_pct);
 		return -ERANGE;
 	}
@@ -498,9 +486,6 @@ static int cap_learning_done(struct cap_learning *cl)
 	}
 
 	cap_learning_post_process(cl);
-#ifdef CONFIG_BATTERY_SHARP
-	cl->power_supply_changed(cl->data);
-#endif /* CONFIG_BATTERY_SHARP */
 out:
 	return rc;
 }
@@ -649,9 +634,6 @@ int cap_learning_post_profile_init(struct cap_learning *cl, int64_t nom_cap_uah)
 		return -EINVAL;
 
 	mutex_lock(&cl->lock);
-#ifdef CONFIG_BATTERY_SHARP
-	cl->stored_learned_capacity = false;
-#endif /* CONFIG_BATTERY_SHARP */
 	cl->nom_cap_uah = nom_cap_uah;
 	rc = cl->get_learned_capacity(cl->data, &cl->learned_cap_uah);
 	if (rc < 0) {

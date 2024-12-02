@@ -205,13 +205,6 @@ int dwc3_gadget_resize_tx_fifos(struct dwc3 *dwc, struct dwc3_ep *dep)
 	if (!dwc->needs_fifo_resize)
 		return 0;
 
-#ifdef CONFIG_USB_DWC3_SHARP_CUST
-	if (dep->endpoint.desc == NULL) {
-		dev_err(dwc->dev, "%s: endpoint(%d) descriptor is NULL\n", __func__, dep->endpoint.ep_num);
-		return 0;
-	}
-#endif /* CONFIG_USB_DWC3_SHARP_CUST */
-
 	/* resize IN endpoints excepts ep0 */
 	if (!usb_endpoint_dir_in(dep->endpoint.desc) ||
 			dep->endpoint.ep_num == 0)
@@ -637,8 +630,23 @@ static int dwc3_gadget_set_ep_config(struct dwc3 *dwc, struct dwc3_ep *dep,
 		params.param0 |= DWC3_DEPCFG_FIFO_NUMBER(dep->number >> 1);
 
 	if (desc->bInterval) {
-		params.param1 |= DWC3_DEPCFG_BINTERVAL_M1(desc->bInterval - 1);
-		dep->interval = 1 << (desc->bInterval - 1);
+		u8 bInterval_m1;
+
+		/*
+		 * Valid range for DEPCFG.bInterval_m1 is from 0 to 13, and it
+		 * must be set to 0 when the controller operates in full-speed.
+		 */
+		bInterval_m1 = min_t(u8, desc->bInterval - 1, 13);
+		if (dwc->gadget.speed == USB_SPEED_FULL)
+			bInterval_m1 = 0;
+
+		if (usb_endpoint_type(desc) == USB_ENDPOINT_XFER_INT &&
+		    dwc->gadget.speed == USB_SPEED_FULL)
+			dep->interval = desc->bInterval;
+		else
+			dep->interval = 1 << (desc->bInterval - 1);
+
+		params.param1 |= DWC3_DEPCFG_BINTERVAL_M1(bInterval_m1);
 	}
 
 	return dwc3_send_gadget_ep_cmd(dep, DWC3_DEPCMD_SETEPCONFIG, &params);
@@ -769,21 +777,6 @@ static void dwc3_remove_requests(struct dwc3 *dwc, struct dwc3_ep *dep)
 
 	dbg_log_string("DONE for %s(%d)", dep->name, dep->number);
 }
-
-#ifdef CONFIG_USB_DWC3_SHARP_CUST
-void dwc3_gadget_ep_fifo_flush(struct usb_ep *ep)
-{
-	unsigned long	flags;
-	struct dwc3_ep	*dep = to_dwc3_ep(ep);
-	struct dwc3		*dwc = dep->dwc;
-
-	spin_lock_irqsave(&dwc->lock, flags);
-	dwc3_remove_requests(dwc, dep);
-	spin_unlock_irqrestore(&dwc->lock, flags);
-
-	dev_dbg(dwc->dev, "%s: all requests removed:%s\n", __func__, dep->name);
-}
-#endif /* CONFIG_USB_DWC3_SHARP_CUST */
 
 /**
  * __dwc3_gadget_ep_disable - Disables a HW endpoint
@@ -1065,6 +1058,19 @@ static void dwc3_prepare_one_trb(struct dwc3_ep *dep,
 	if (usb_endpoint_xfer_bulk(dep->endpoint.desc) && dep->stream_capable)
 		trb->ctrl |= DWC3_TRB_CTRL_SID_SOFN(req->request.stream_id);
 
+	/*
+	 * As per data book 4.2.3.2TRB Control Bit Rules section
+	 *
+	 * The controller autonomously checks the HWO field of a TRB to determine if the
+	 * entire TRB is valid. Therefore, software must ensure that the rest of the TRB
+	 * is valid before setting the HWO field to '1'. In most systems, this means that
+	 * software must update the fourth DWORD of a TRB last.
+	 *
+	 * However there is a possibility of CPU re-ordering here which can cause
+	 * controller to observe the HWO bit set prematurely.
+	 * Add a write memory barrier to prevent CPU re-ordering.
+	 */
+	wmb();
 	trb->ctrl |= DWC3_TRB_CTRL_HWO;
 
 	trace_dwc3_prepare_trb(dep, trb);
@@ -1094,19 +1100,19 @@ static struct dwc3_trb *dwc3_ep_prev_trb(struct dwc3_ep *dep, u8 index)
 
 static u32 dwc3_calc_trbs_left(struct dwc3_ep *dep)
 {
-	struct dwc3_trb		*tmp;
 	u8			trbs_left;
 
 	/*
-	 * If enqueue & dequeue are equal than it is either full or empty.
-	 *
-	 * One way to know for sure is if the TRB right before us has HWO bit
-	 * set or not. If it has, then we're definitely full and can't fit any
-	 * more transfers in our ring.
+	 * If the enqueue & dequeue are equal then the TRB ring is either full
+	 * or empty. It's considered full when there are DWC3_TRB_NUM-1 of TRBs
+	 * pending to be processed by the driver.
 	 */
 	if (dep->trb_enqueue == dep->trb_dequeue) {
-		tmp = dwc3_ep_prev_trb(dep, dep->trb_enqueue);
-		if (!tmp || tmp->ctrl & DWC3_TRB_CTRL_HWO)
+		/*
+		 * If there is any request remained in the started_list at
+		 * this point, that means there is no TRB available.
+		 */
+		if (!list_empty(&dep->started_list))
 			return 0;
 
 		return DWC3_TRB_NUM - 1;
@@ -1666,12 +1672,10 @@ static int dwc3_gadget_ep_set_halt(struct usb_ep *ep, int value)
 
 	int				ret;
 
-#ifdef CONFIG_USB_DWC3_SHARP_CUST
 	if (!ep->desc) {
 		dev_err(dwc->dev, "(%s)'s desc is NULL.\n", dep->name);
 		return -EINVAL;
 	}
-#endif /* CONFIG_USB_DWC3_SHARP_CUST */
 
 	spin_lock_irqsave(&dwc->lock, flags);
 	ret = __dwc3_gadget_ep_set_halt(dep, value, false);
@@ -1728,10 +1732,6 @@ static const struct usb_ep_ops dwc3_gadget_ep_ops = {
 	.dequeue	= dwc3_gadget_ep_dequeue,
 	.set_halt	= dwc3_gadget_ep_set_halt,
 	.set_wedge	= dwc3_gadget_ep_set_wedge,
-#ifdef CONFIG_USB_DWC3_SHARP_CUST
-	/* Bug fix for MSC Tests failure : Command Set Test - Device Configured */
-	.fifo_flush	= dwc3_gadget_ep_fifo_flush,
-#endif /* CONFIG_USB_DWC3_SHARP_CUST */
 };
 
 /* -------------------------------------------------------------------------- */
@@ -2276,35 +2276,6 @@ static int __dwc3_gadget_start(struct dwc3 *dwc)
 	 * STAR#9000525659: Clock Domain Crossing on DCTL in
 	 * USB 2.0 Mode
 	 */
-#ifdef CONFIG_USB_DWC3_SHARP_CUST
-	if (dwc->fs_connect_enable) {
-		reg |= DWC3_DCFG_FULLSPEED;
-	} else if (dwc->revision < DWC3_REVISION_220A) {
-		reg |= DWC3_DCFG_SUPERSPEED;
-	} else {
-		switch (dwc->maximum_speed) {
-		case USB_SPEED_LOW:
-			reg |= DWC3_DCFG_LOWSPEED;
-			break;
-		case USB_SPEED_FULL:
-			reg |= DWC3_DCFG_FULLSPEED;
-			break;
-		case USB_SPEED_HIGH:
-			reg |= DWC3_DCFG_HIGHSPEED;
-			break;
-		case USB_SPEED_SUPER_PLUS:
-			reg |= DWC3_DCFG_SUPERSPEED_PLUS;
-			break;
-		default:
-			dev_err(dwc->dev, "invalid dwc->maximum_speed (%d)\n",
-					dwc->maximum_speed);
-			/* fall through */
-		case USB_SPEED_SUPER:
-			reg |= DWC3_DCFG_SUPERSPEED;
-			break;
-		}
-	}
-#else /* CONFIG_USB_DWC3_SHARP_CUST */
 	if (dwc->revision < DWC3_REVISION_220A) {
 		reg |= DWC3_DCFG_SUPERSPEED;
 	} else {
@@ -2330,7 +2301,6 @@ static int __dwc3_gadget_start(struct dwc3 *dwc)
 			break;
 		}
 	}
-#endif /* CONFIG_USB_DWC3_SHARP_CUST */
 	dwc3_writel(dwc->regs, DWC3_DCFG, reg);
 
 	/* Programs the number of outstanding pipelined transfer requests
@@ -2452,32 +2422,6 @@ static int dwc3_gadget_restart_usb_session(struct usb_gadget *g)
 	return dwc3_notify_event(dwc, DWC3_CONTROLLER_RESTART_USB_SESSION, 0);
 }
 
-#ifdef CONFIG_USB_DWC3_SHARP_CUST
-int dwc3_gadget_set_fullspeed_connect(struct usb_gadget *g,
-		unsigned long enable)
-{
-	struct dwc3		*dwc = gadget_to_dwc(g);
-
-	if (!dwc)
-		return -ENODEV;
-
-	if (enable != 0 && enable != 1)
-		return -EINVAL;
-
-	dev_info(dwc->dev, "set_fullspeed_connect %d\n", (int)enable);
-	dwc->fs_connect_enable = enable;
-
-	return 0;
-}
-
-static int dwc3_gadget_is_selfpowered(struct usb_gadget *g)
-{
-	if(!g)
-		return -ENODEV;
-	return g->is_selfpowered;
-}
-#endif /* CONFIG_USB_DWC3_SHARP_CUST */
-
 static const struct usb_gadget_ops dwc3_gadget_ops = {
 	.get_frame		= dwc3_gadget_get_frame,
 	.wakeup			= dwc3_gadget_wakeup,
@@ -2489,10 +2433,6 @@ static const struct usb_gadget_ops dwc3_gadget_ops = {
 	.udc_start		= dwc3_gadget_start,
 	.udc_stop		= dwc3_gadget_stop,
 	.restart		= dwc3_gadget_restart_usb_session,
-#ifdef CONFIG_USB_DWC3_SHARP_CUST
-	.set_fullspeed		= dwc3_gadget_set_fullspeed_connect,
-	.is_selfpowered 	= dwc3_gadget_is_selfpowered,
-#endif /* CONFIG_USB_DWC3_SHARP_CUST */
 };
 
 /* -------------------------------------------------------------------------- */
@@ -2920,12 +2860,6 @@ static void dwc3_endpoint_interrupt(struct dwc3 *dwc,
 	}
 
 	dep->dbg_ep_events.total++;
-#ifdef CONFIG_USB_DWC3_SHARP_CUST
-	if (dep->endpoint.desc == NULL) {
-		dev_err(dwc->dev, "%s: endpoint descriptor is NULL\n", __func__);
-		return;
-	}
-#endif /* CONFIG_USB_DWC3_SHARP_CUST */
 
 	switch (event->endpoint_event) {
 	case DWC3_DEPEVT_XFERCOMPLETE:
@@ -3197,6 +3131,15 @@ static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
 	u32			reg;
 
 	dwc->connected = true;
+
+	/*
+	 * Ideally, dwc3_reset_gadget() would trigger the function
+	 * drivers to stop any active transfers through ep disable.
+	 * However, for functions which defer ep disable, such as mass
+	 * storage, we will need to rely on the call to stop active
+	 * transfers here, and avoid allowing of request queuing.
+	 */
+	dwc->connected = false;
 
 	/*
 	 * WORKAROUND: DWC3 revisions <1.88a have an issue which
@@ -3797,7 +3740,6 @@ static irqreturn_t dwc3_process_event_buf(struct dwc3 *dwc)
 
 	dwc->bh_handled_evt_cnt[dwc->bh_dbg_index] += (evt->count / 4);
 	evt->count = 0;
-	evt->flags &= ~DWC3_EVENT_PENDING;
 	ret = IRQ_HANDLED;
 
 	/* Unmask interrupt */
@@ -3808,6 +3750,9 @@ static irqreturn_t dwc3_process_event_buf(struct dwc3 *dwc)
 	if (dwc->imod_interval)
 		dwc3_writel(dwc->regs, DWC3_GEVNTCOUNT(0),
 				DWC3_GEVNTCOUNT_EHB);
+
+	/* Keep the clearing of DWC3_EVENT_PENDING at the end */
+	evt->flags &= ~DWC3_EVENT_PENDING;
 
 	return ret;
 }
@@ -3831,12 +3776,14 @@ static irqreturn_t dwc3_thread_interrupt(int irq, void *_dwc)
 
 	start_time = ktime_get();
 
+	local_bh_disable();
 	spin_lock_irqsave(&dwc->lock, flags);
 	dwc->bh_handled_evt_cnt[dwc->bh_dbg_index] = 0;
 
 	ret = dwc3_process_event_buf(dwc);
 
 	spin_unlock_irqrestore(&dwc->lock, flags);
+	local_bh_enable();
 
 	temp_time = ktime_to_us(ktime_sub(ktime_get(), start_time));
 	dwc->bh_completion_time[dwc->bh_dbg_index] = temp_time;
@@ -3933,42 +3880,6 @@ irqreturn_t dwc3_interrupt(int irq, void *_dwc)
 	return IRQ_HANDLED;
 }
 
-#ifdef CONFIG_USB_DWC3_SHARP_CUST
-static ssize_t show_usb_state(struct device *dev, struct device_attribute *attr,
-		char *buf)
-{
-	size_t i = 0;
-	struct dwc3 *dwc = container_of(dev, struct dwc3, gadget.dev);
-	char *state[] ={
-		[USB_STATE_NOTATTACHED] = "USB_STATE_NOTATTACHED",
-		[USB_STATE_ATTACHED] = "USB_STATE_ATTACHED",
-		[USB_STATE_POWERED] = "USB_STATE_POWERED",
-		[USB_STATE_RECONNECTING] = "USB_STATE_RECONNECTING",
-		[USB_STATE_UNAUTHENTICATED] = "USB_STATE_UNAUTHENTICATED",
-		[USB_STATE_DEFAULT] = "USB_STATE_DEFAULT",
-		[USB_STATE_ADDRESS] = "USB_STATE_ADDRESS",
-		[USB_STATE_CONFIGURED] = "USB_STATE_CONFIGURED",
-		[USB_STATE_SUSPENDED] = "USB_STATE_SUSPENDED",
-	};
-
-	if (NULL == buf)
-		return -EINVAL;
-
-	if (NULL == dwc)
-		return -ENODEV;
-
-	if (dwc->gadget.state < 0 || dwc->gadget.state >= ARRAY_SIZE(state)) {
-		return scnprintf(buf, PAGE_SIZE, "UNKNOWN\n");
-	}
-
-	i = scnprintf(buf, PAGE_SIZE, "%s\n", state[dwc->gadget.state]);
-
-	return i;
-}
-
-static DEVICE_ATTR(usb_state, S_IRUSR, show_usb_state, 0);
-#endif /* CONFIG_USB_DWC3_SHARP_CUST */
-
 /**
  * dwc3_gadget_init - Initializes gadget related registers
  * @dwc: pointer to our controller context structure
@@ -4048,9 +3959,6 @@ int dwc3_gadget_init(struct dwc3 *dwc)
 	dwc->gadget.ops			= &dwc3_gadget_ops;
 	dwc->gadget.speed		= USB_SPEED_UNKNOWN;
 	dwc->gadget.sg_supported	= true;
-/* COORDINATOR Qualcomm_PostCS5 BUILDERR MODIFY start */
-/*	dwc->gadget.l1_supported	= false;*/
-/* COORDINATOR Qualcomm_PostCS5 BUILDERR MODIFY end */
 	dwc->gadget.name		= "dwc3-gadget";
 	dwc->gadget.l1_supported	= !dwc->usb2_l1_disable;
 
@@ -4105,9 +4013,6 @@ int dwc3_gadget_init(struct dwc3 *dwc)
 		pm_runtime_get(&dwc->gadget.dev);
 	}
 
-#ifdef CONFIG_USB_DWC3_SHARP_CUST
-	device_create_file(&dwc->gadget.dev, &dev_attr_usb_state);
-#endif /* CONFIG_USB_DWC3_SHARP_CUST */
 	return 0;
 
 err5:
@@ -4141,9 +4046,6 @@ void dwc3_gadget_exit(struct dwc3 *dwc)
 		pm_runtime_put(&dwc->gadget.dev);
 		pm_runtime_disable(&dwc->gadget.dev);
 	}
-#ifdef CONFIG_USB_DWC3_SHARP_CUST
-	device_remove_file(&dwc->gadget.dev, &dev_attr_usb_state);
-#endif /* CONFIG_USB_DWC3_SHARP_CUST */
 
 	usb_del_gadget_udc(&dwc->gadget);
 

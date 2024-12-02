@@ -1014,71 +1014,6 @@ done:
 	return rc;
 }
 
-#ifdef CONFIG_BATTERY_SHARP
-#define CC_SOC_MOV_AVG_SAMPLE	1
-#define SH_CALC_CURRENT_AVG(cc_soc, update_time) div64_s64((div64_s64(cc_soc * (int64_t)chip->cl->nom_cap_uah, chip->cl->cc_soc_max) * 3600), update_time)
-static int qg_get_cc_soc(void *data, int *cc_soc);
-static void update_current_avg(struct qpnp_qg *chip)
-{
-	int i, rc = 0;
-	static int pre_cc_soc = 0;
-	static int delta_cc_soc[CC_SOC_MOV_AVG_SAMPLE] = {0};
-	static unsigned long pre_update_time = 0;
-	static unsigned long delta_update_time[CC_SOC_MOV_AVG_SAMPLE] = {0};
-	static int cur_index = 0;
-	static bool call_once = false;
-	int temp_delta_cc_soc = 0;
-	unsigned long temp_delta_update_time = 0;
-	unsigned long update_time = 0;
-	int64_t sum_cc_soc = 0;
-	int64_t sum_update_time = 0;
-	int cc_soc;
-	int ibat = 0;
-
-	mutex_lock(&chip->current_avg_lock);
-
-	rc = qg_get_cc_soc(chip, &cc_soc);
-	if (!rc) pr_info("cc_soc:%d, nom_cap:%d, --> %d%%\n", cc_soc, (int)chip->cl->nom_cap_uah/1000, (int)div64_s64(((int64_t)cc_soc * 100), chip->cl->cc_soc_max));
-
-	if ((!rc) && !get_rtc_time(&update_time)) {
-		if (call_once) {
-			temp_delta_cc_soc = pre_cc_soc - cc_soc;
-			temp_delta_update_time = update_time - pre_update_time;
-
-			delta_cc_soc[cur_index] = temp_delta_cc_soc;
-			delta_update_time[cur_index] = temp_delta_update_time;
-			for (i = 0; i < CC_SOC_MOV_AVG_SAMPLE; i++) {
-				sum_update_time += delta_update_time[i];
-				sum_cc_soc += delta_cc_soc[i];
-				pr_debug("cc_soc:delta_update_time[%d]:%lu, delta_cc_soc[%d]:%d\n", i, delta_update_time[i], i, delta_cc_soc[i]);
-			}
-
-			if (sum_update_time != 0) {
-				chip->current_avg = SH_CALC_CURRENT_AVG(sum_cc_soc, sum_update_time);
-				pr_info("cc_soc: sum_update_time:%lld, sum_cc_soc:%lld, current_avg:%lld\n", sum_update_time, sum_cc_soc, chip->current_avg);
-			} else {
-				pr_info("cc_soc: current_avg is not update.\n");
-			}
-		} else {
-			rc = qg_get_battery_current(chip, &ibat);
-			if (!rc) {
-				chip->current_avg = ibat;
-				if (cur_index >= (CC_SOC_MOV_AVG_SAMPLE-1)) call_once = true;
-				pr_info("cc_soc: current-->current_avg:%lld\n", chip->current_avg);
-			} else {
-				pr_err("qg_get_battery_current failed! rc:%d", rc);
-			}
-		}
-		cur_index++;
-		if (cur_index >= CC_SOC_MOV_AVG_SAMPLE) cur_index = 0;
-		pre_cc_soc = cc_soc;
-		pre_update_time = update_time;
-	}
-
-	mutex_unlock(&chip->current_avg_lock);
-}
-#endif /* CONFIG_BATTERY_SHARP */
-
 static void process_udata_work(struct work_struct *work)
 {
 	struct qpnp_qg *chip = container_of(work,
@@ -1140,10 +1075,6 @@ static void process_udata_work(struct work_struct *work)
 
 	if (!chip->dt.esr_disable)
 		qg_store_esr_params(chip);
-
-#ifdef CONFIG_BATTERY_SHARP
-	update_current_avg(chip);
-#endif /* CONFIG_BATTERY_SHARP */
 
 	qg_dbg(chip, QG_DEBUG_STATUS, "udata update: batt_soc=%d cc_soc=%d full_soc=%d qg_esr=%d\n",
 		(chip->batt_soc != INT_MIN) ? chip->batt_soc : -EINVAL,
@@ -1510,18 +1441,6 @@ static int qg_get_cc_soc(void *data, int *cc_soc)
 	return 0;
 }
 
-#ifdef CONFIG_BATTERY_SHARP
-static int qg_power_supply_changed(void *data)
-{
-	struct qpnp_qg *chip = data;
-
-	if (chip->qg_psy)
-		power_supply_changed(chip->qg_psy);
-
-	return 0;
-}
-#endif /* CONFIG_BATTERY_SHARP */
-
 static int qg_restore_cycle_count(void *data, u16 *buf, int length)
 {
 	struct qpnp_qg *chip = data;
@@ -1777,11 +1696,6 @@ static int qg_psy_set_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_ESR_NOMINAL:
 		chip->esr_nominal = pval->intval;
 		break;
-#ifdef CONFIG_BATTERY_SHARP
-	case POWER_SUPPLY_PROP_STORED_LEARNED_CAPACITY:
-		chip->cl->stored_learned_capacity = (pval->intval);
-		break;
-#endif /* CONFIG_BATTERY_SHARP */
 	default:
 		break;
 	}
@@ -1902,20 +1816,6 @@ static int qg_psy_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_QG_VBMS_MODE:
 		pval->intval = !!chip->dt.qg_vbms_mode;
 		break;
-#ifdef CONFIG_BATTERY_SHARP
-	case POWER_SUPPLY_PROP_BATT_SOC:
-		pval->intval = chip->batt_soc;
-		break;
-	case POWER_SUPPLY_PROP_CURRENT_AVG:
-		pval->intval = chip->current_avg;
-		break;
-	case POWER_SUPPLY_PROP_BATTERY_FULL_DESIGN:
-		pval->intval = chip->bp.nom_batt_cap_mah;
-		break;
-	case POWER_SUPPLY_PROP_STORED_LEARNED_CAPACITY:
-		pval->intval = chip->cl->stored_learned_capacity;
-		break;
-#endif /* CONFIG_BATTERY_SHARP */
 	default:
 		pr_debug("Unsupported property %d\n", psp);
 		break;
@@ -1932,9 +1832,6 @@ static int qg_property_is_writeable(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_ESR_ACTUAL:
 	case POWER_SUPPLY_PROP_ESR_NOMINAL:
 	case POWER_SUPPLY_PROP_SOH:
-#ifdef CONFIG_BATTERY_SHARP
-	case POWER_SUPPLY_PROP_STORED_LEARNED_CAPACITY:
-#endif /* CONFIG_BATTERY_SHARP */
 		return 1;
 	default:
 		break;
@@ -1973,12 +1870,6 @@ static enum power_supply_property qg_psy_props[] = {
 	POWER_SUPPLY_PROP_SOH,
 	POWER_SUPPLY_PROP_CC_SOC,
 	POWER_SUPPLY_PROP_QG_VBMS_MODE,
-#ifdef CONFIG_BATTERY_SHARP
-	POWER_SUPPLY_PROP_BATT_SOC,
-	POWER_SUPPLY_PROP_CURRENT_AVG,
-	POWER_SUPPLY_PROP_BATTERY_FULL_DESIGN,
-	POWER_SUPPLY_PROP_STORED_LEARNED_CAPACITY,
-#endif /* CONFIG_BATTERY_SHARP */
 };
 
 static const struct power_supply_desc qg_psy_desc = {
@@ -2022,11 +1913,7 @@ static int qg_charge_full_update(struct qpnp_qg *chip)
 				chip->msoc, health, chip->charge_full,
 				chip->charge_done);
 	if (chip->charge_done && !chip->charge_full) {
-#ifdef CONFIG_BATTERY_SHARP
-		if (chip->msoc >= 97 && (health == POWER_SUPPLY_HEALTH_GOOD || health == POWER_SUPPLY_HEALTH_COOL)) {
-#else
 		if (chip->msoc >= 99 && health == POWER_SUPPLY_HEALTH_GOOD) {
-#endif /* CONFIG_BATTERY_SHARP */
 			chip->charge_full = true;
 			qg_dbg(chip, QG_DEBUG_STATUS, "Setting charge_full (0->1) @ msoc=%d\n",
 					chip->msoc);
@@ -2295,18 +2182,6 @@ static void qg_status_change_work(struct work_struct *work)
 		if (rc < 0) {
 			pr_err("Failed to read BATT_TEMP at PON rc=%d\n", rc);
 		} else {
-#ifdef CONFIG_BATTERY_SHARP
-			if(!chip->profile_loaded && !chip->cl->learned_cap_uah) {
-				int64_t act_cap_mah = 0;
-				rc = qg_get_learned_capacity(chip, &act_cap_mah);
-				if (rc < 0) {
-					pr_err("Failed to read learned_cap, rc=%d\n", rc);
-				}
-				chip->cl->learned_cap_uah = act_cap_mah * 1000;
-				qg_dbg(chip, QG_DEBUG_STATUS, "Get learned capacity from sram %lld\n", chip->cl->learned_cap_uah);
-			}
-#endif /* CONFIG_BATTERY_SHARP */
-
 			batt_soc_32b = div64_u64(
 					chip->batt_soc * BATT_SOC_32BIT,
 					QG_SOC_FULL);
@@ -2603,24 +2478,15 @@ static int qg_load_battery_profile(struct qpnp_qg *chip)
 	struct device_node *node = chip->dev->of_node;
 	struct device_node *batt_node, *profile_node;
 	int rc;
-#ifdef CONFIG_BATTERY_SHARP
-	const char *batt_type;
-#endif /* CONFIG_BATTERY_SHARP */
 
 	batt_node = of_find_node_by_name(node, "qcom,battery-data");
 	if (!batt_node) {
 		pr_err("Batterydata not available\n");
 		return -ENXIO;
 	}
-#ifdef CONFIG_BATTERY_SHARP
-	batt_type = "sharp_e2";
-	profile_node = of_batterydata_get_best_profile(batt_node,
-				chip->batt_id_ohm / 1000, batt_type);
-#else
+
 	profile_node = of_batterydata_get_best_profile(batt_node,
 				chip->batt_id_ohm / 1000, NULL);
-
-#endif /* CONFIG_BATTERY_SHARP */
 	if (IS_ERR(profile_node)) {
 		rc = PTR_ERR(profile_node);
 		pr_err("Failed to detect valid QG battery profile %d\n", rc);
@@ -2660,15 +2526,6 @@ static int qg_load_battery_profile(struct qpnp_qg *chip)
 		pr_err("Failed to read QG profile version rc:%d\n", rc);
 		chip->bp.qg_profile_version = -EINVAL;
 	}
-
-#ifdef CONFIG_BATTERY_SHARP
-	rc = of_property_read_u32(profile_node, "qcom,nom-batt-capacity-mah",
-			&chip->bp.nom_batt_cap_mah);
-	if (rc < 0) {
-		pr_err("battery nominal capacity unavailable, rc:%d\n", rc);
-		chip->bp.nom_batt_cap_mah = -EINVAL;
-	}
-#endif /* CONFIG_BATTERY_SHARP */
 
 	qg_dbg(chip, QG_DEBUG_PROFILE, "profile=%s FV=%duV FCC=%dma\n",
 			chip->bp.batt_type_str, chip->bp.float_volt_uv,
@@ -3321,9 +3178,6 @@ static int qg_alg_init(struct qpnp_qg *chip)
 	cl->get_cc_soc = qg_get_cc_soc;
 	cl->get_learned_capacity = qg_get_learned_capacity;
 	cl->store_learned_capacity = qg_store_learned_capacity;
-#ifdef CONFIG_BATTERY_SHARP
-	cl->power_supply_changed = qg_power_supply_changed;
-#endif /* CONFIG_BATTERY_SHARP */
 	cl->data = chip;
 
 	rc = cap_learning_init(cl);
@@ -3936,9 +3790,6 @@ static int qpnp_qg_probe(struct platform_device *pdev)
 	mutex_init(&chip->bus_lock);
 	mutex_init(&chip->soc_lock);
 	mutex_init(&chip->data_lock);
-#ifdef CONFIG_BATTERY_SHARP
-	mutex_init(&chip->current_avg_lock);
-#endif /* CONFIG_BATTERY_SHARP */
 	init_waitqueue_head(&chip->qg_wait_q);
 	chip->maint_soc = -EINVAL;
 	chip->batt_soc = INT_MIN;
@@ -4110,9 +3961,6 @@ static int qpnp_qg_remove(struct platform_device *pdev)
 	mutex_destroy(&chip->bus_lock);
 	mutex_destroy(&chip->data_lock);
 	mutex_destroy(&chip->soc_lock);
-#ifdef CONFIG_BATTERY_SHARP
-	mutex_destroy(&chip->current_avg_lock);
-#endif /* CONFIG_BATTERY_SHARP */
 	if (chip->awake_votable)
 		destroy_votable(chip->awake_votable);
 

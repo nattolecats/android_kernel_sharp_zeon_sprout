@@ -443,6 +443,9 @@ struct spi_master {
 #define SPI_MASTER_MUST_RX      BIT(3)		/* requires rx */
 #define SPI_MASTER_MUST_TX      BIT(4)		/* requires tx */
 
+	/* flag indicating this is a non-devres managed controller */
+	bool			devm_allocated;
+
 	/*
 	 * on some hardware transfer / message size may be constrained
 	 * the limit may depend on device transfer settings
@@ -601,6 +604,8 @@ extern void spi_finalize_current_transfer(struct spi_master *master);
 /* the spi driver core manages memory for the spi_master classdev */
 extern struct spi_master *
 spi_alloc_master(struct device *host, unsigned size);
+extern struct spi_master *
+devm_spi_alloc_master(struct device *dev, unsigned int size);
 
 extern int spi_register_master(struct spi_master *master);
 extern int devm_spi_register_master(struct device *dev,
@@ -761,10 +766,6 @@ struct spi_transfer {
 	u8		bits_per_word;
 	u16		delay_usecs;
 	u32		speed_hz;
-#if defined( CONFIG_SHARP_SPI_DEASSERT_WAIT )
-#define SH_DEASSERT_WAIT_CLK_MAX	63
-	u16		deassert_wait;	/* The de-assertion wait time (us) */
-#endif	/* defined( CONFIG_SHARP_SPI_DEASSERT_WAIT ) */
 
 	struct list_head transfer_list;
 };

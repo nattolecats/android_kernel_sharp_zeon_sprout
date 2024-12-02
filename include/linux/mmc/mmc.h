@@ -216,9 +216,6 @@ struct _mmc_csd {
  */
 
 #define EXT_CSD_CMDQ			15	/* R/W */
-#ifdef CONFIG_SHARP_MMC_EMMC_FFU
-#define EXT_CSD_FFU_STATUS		26	/* RO */
-#endif /* CONFIG_SHARP_MMC_EMMC_FFU */
 #define EXT_CSD_BARRIER_CTRL		31      /* R/W */
 #define EXT_CSD_FLUSH_CACHE		32      /* W */
 #define EXT_CSD_CACHE_CTRL		33      /* R/W */
@@ -283,15 +280,9 @@ struct _mmc_csd {
 #define EXT_CSD_PRE_EOL_INFO		267	/* RO */
 #define EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_A	268	/* RO */
 #define EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_B	269	/* RO */
-#ifdef CONFIG_SHARP_MMC_EMMC_FFU
-#define EXT_CSD_NUM_OF_FW_SECTORS_PRG	302	/* RO */
-#endif /* CONFIG_SHARP_MMC_EMMC_FFU */
 #define EXT_CSD_CMDQ_DEPTH		307	/* RO */
 #define EXT_CSD_CMDQ_SUPPORT		308	/* RO */
 #define EXT_CSD_BARRIER_SUPPORT		486	/* RO */
-#ifdef CONFIG_SHARP_MMC_EMMC_FFU
-#define EXT_CSD_FFU_ARG			487	/* RO */
-#endif /* CONFIG_SHARP_MMC_EMMC_FFU */
 #define EXT_CSD_SUPPORTED_MODE		493	/* RO */
 #define EXT_CSD_TAG_UNIT_SIZE		498	/* RO */
 #define EXT_CSD_DATA_TAG_SUPPORT	499	/* RO */
@@ -391,12 +382,6 @@ struct _mmc_csd {
 
 #define EXT_CSD_PACKED_GENERIC_ERROR	BIT(0)
 #define EXT_CSD_PACKED_INDEXED_ERROR	BIT(1)
-
-#ifdef CONFIG_SHARP_MMC
-  #define HOST_MMC_MMC	"mmc0"
-  #define HOST_MMC_SD	"mmc1"
-  #define HOST_MMC_SDIO	"mmc2"
-#endif /* CONFIG_SHARP_MMC */
 
 /*
  * BKOPS status level

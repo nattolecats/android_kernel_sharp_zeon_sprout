@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2013-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2013-2021, The Linux Foundation. All rights reserved.
  * Linux Foundation chooses to take subject only to the GPLv2 license terms,
  * and distributes only under these terms.
  *
@@ -54,10 +54,10 @@
 #define MAX_CDEV_INST_NAME	15
 #define MAX_CDEV_FUNC_NAME	5
 
-#define BRIDGE_RX_QUEUE_SIZE	32
-#define BRIDGE_RX_BUF_SIZE	5120
-#define BRIDGE_TX_QUEUE_SIZE	32
-#define BRIDGE_TX_BUF_SIZE	5120
+#define BRIDGE_RX_QUEUE_SIZE	8
+#define BRIDGE_RX_BUF_SIZE	2048
+#define BRIDGE_TX_QUEUE_SIZE	8
+#define BRIDGE_TX_BUF_SIZE	2048
 #define BRIDGE_RX_BUF_SIZE_STANDALONE  (50 * 1024)
 
 #define GS_LOG2_NOTIFY_INTERVAL		5  /* 1 << 5 == 32 msec */
@@ -95,7 +95,7 @@ struct cserial {
 
 struct f_cdev {
 	struct cdev		fcdev_cdev;
-	struct device		*dev;
+	struct device		dev;
 	unsigned int		port_num;
 	char			name[sizeof(DEVICE_NAME) + 2];
 	int			minor;
@@ -693,16 +693,6 @@ unsigned int dun_cser_get_rts(struct cserial *cser)
 		return 0;
 }
 
-#ifdef CONFIG_USB_ANDROID_SHARP_CUST
-bool dun_cser_dtr_rts(struct cserial *cser)
-{
-	if (cser != NULL){
-		return dun_cser_get_dtr(cser) & dun_cser_get_rts(cser);
-	}
-	return 0;
-}
-#endif /* CONFIG_USB_ANDROID_SHARP_CUST */
-
 unsigned int dun_cser_send_carrier_detect(struct cserial *cser,
 				unsigned int yes)
 {
@@ -897,13 +887,16 @@ static void cser_free_inst(struct usb_function_instance *fi)
 	opts = container_of(fi, struct f_cdev_opts, func_inst);
 
 	if (opts->port) {
-		device_destroy(fcdev_classp, MKDEV(major, opts->port->minor));
-		cdev_del(&opts->port->fcdev_cdev);
+		cdev_device_del(&opts->port->fcdev_cdev, &opts->port->dev);
+		mutex_lock(&chardev_ida_lock);
+		ida_simple_remove(&chardev_ida, opts->port->minor);
+		mutex_unlock(&chardev_ida_lock);
+		usb_cser_debugfs_exit();
+		put_device(&opts->port->dev);
 	}
+
 	usb_cser_chardev_deinit();
-	usb_cser_debugfs_exit();
 	kfree(opts->func_name);
-	kfree(opts->port);
 	kfree(opts);
 }
 
@@ -913,9 +906,6 @@ static void usb_cser_unbind(struct usb_configuration *c, struct usb_function *f)
 
 	usb_free_all_descriptors(f);
 	usb_cser_free_req(port->port_usb.notify, port->port_usb.notify_req);
-#ifdef CONFIG_USB_ANDROID_SHARP_CUST
-	port->port_usb.port_handshake_bits = 0;
-#endif /* CONFIG_USB_ANDROID_SHARP_CUST */
 }
 
 static int usb_cser_alloc_requests(struct usb_ep *ep, struct list_head *head,
@@ -969,11 +959,7 @@ static void usb_cser_start_rx(struct f_cdev *port)
 
 		req = list_entry(pool->next, struct usb_request, list);
 		list_del_init(&req->list);
-#ifdef CONFIG_USB_ANDROID_SHARP_CUST
-		req->length = min((u16)ep->maxpacket, (u16)BRIDGE_RX_BUF_SIZE);
-#else /* CONFIG_USB_ANDROID_SHARP_CUST */
 		req->length = bridge_rx_buf_size;
-#endif /* CONFIG_USB_ANDROID_SHARP_CUST */
 		req->complete = usb_cser_read_complete;
 		spin_unlock_irqrestore(&port->port_lock, flags);
 		ret = usb_ep_queue(ep, req, GFP_KERNEL);
@@ -1131,13 +1117,10 @@ int f_cdev_open(struct inode *inode, struct file *file)
 	struct f_cdev *port;
 
 	port = container_of(inode->i_cdev, struct f_cdev, fcdev_cdev);
-	if (!port) {
-		pr_err("Port is NULL.\n");
-		return -EINVAL;
-	}
-
-	if (port && port->port_open) {
+	get_device(&port->dev);
+	if (port->port_open) {
 		pr_err("port is already opened.\n");
+		put_device(&port->dev);
 		return -EBUSY;
 	}
 
@@ -1147,6 +1130,7 @@ int f_cdev_open(struct inode *inode, struct file *file)
 					port->is_connected);
 	if (ret) {
 		pr_debug("open interrupted.\n");
+		put_device(&port->dev);
 		return ret;
 	}
 
@@ -1166,16 +1150,12 @@ int f_cdev_release(struct inode *inode, struct file *file)
 	struct f_cdev *port;
 
 	port = file->private_data;
-	if (!port) {
-		pr_err("port is NULL.\n");
-		return -EINVAL;
-	}
-
 	spin_lock_irqsave(&port->port_lock, flags);
 	port->port_open = false;
 	port->cbits_updated = false;
 	spin_unlock_irqrestore(&port->port_lock, flags);
 	pr_debug("port(%s)(%pK) is closed.\n", port->name, port);
+	put_device(&port->dev);
 
 	return 0;
 }
@@ -1333,11 +1313,9 @@ ssize_t f_cdev_write(struct file *file,
 		pr_err("copy_from_user failed: err %d\n", ret);
 		ret = -EFAULT;
 	} else {
-		int prev = req->zero;
 		req->length = xfer_size;
 		req->zero = 1;
 		ret = usb_ep_queue(in, req, GFP_KERNEL);
-		req->zero = prev;
 		if (ret) {
 			pr_err("EP QUEUE failed:%d\n", ret);
 			ret = -EIO;
@@ -1746,11 +1724,17 @@ static void usb_cser_debugfs_exit(void)
 	debugfs_remove_recursive(debugfs.debugfs_root);
 }
 
+static void cdev_device_release(struct device *dev)
+{
+	struct f_cdev *port = container_of(dev, struct f_cdev, dev);
+
+	pr_debug("Free cdev port(%d)\n", port->port_num);
+	kfree(port);
+}
+
 static struct f_cdev *f_cdev_alloc(char *func_name, int portno)
 {
 	int ret;
-	dev_t dev;
-	struct device *device;
 	struct f_cdev *port;
 
 	port = kzalloc(sizeof(struct f_cdev), GFP_KERNEL);
@@ -1800,17 +1784,16 @@ static struct f_cdev *f_cdev_alloc(char *func_name, int portno)
 
 	/* create char device */
 	cdev_init(&port->fcdev_cdev, &f_cdev_fops);
-	dev = MKDEV(major, port->minor);
-	ret = cdev_add(&port->fcdev_cdev, dev, 1);
+	device_initialize(&port->dev);
+	port->dev.class = fcdev_classp;
+	port->dev.parent = NULL;
+	port->dev.release = cdev_device_release;
+	port->dev.devt = MKDEV(major, port->minor);
+	dev_set_name(&port->dev, port->name);
+	ret = cdev_device_add(&port->fcdev_cdev, &port->dev);
 	if (ret) {
 		pr_err("Failed to add cdev for port(%s)\n", port->name);
 		goto err_cdev_add;
-	}
-
-	device = device_create(fcdev_classp, NULL, dev, NULL, port->name);
-	if (IS_ERR(device)) {
-		ret = PTR_ERR(device);
-		goto err_create_dev;
 	}
 
 	usb_cser_debugfs_init(port);
@@ -1819,8 +1802,6 @@ static struct f_cdev *f_cdev_alloc(char *func_name, int portno)
 			port->name, port, port->port_num);
 	return port;
 
-err_create_dev:
-	cdev_del(&port->fcdev_cdev);
 err_cdev_add:
 	destroy_workqueue(port->fcdev_wq);
 err_get_ida:
@@ -1959,26 +1940,9 @@ static ssize_t usb_cser_status_store(struct config_item *item,
 	return len;
 }
 
-#ifdef CONFIG_USB_ANDROID_SHARP_CUST
-static ssize_t usb_cser_dtr_rts_show(struct config_item *item, char *page)
-{
-	struct f_cdev *port = to_f_cdev_opts(item)->port;
-	struct cserial *cser = &port->port_usb;
-	unsigned int dtr_rts = dun_cser_dtr_rts(cser);
-
-	return snprintf(page, PAGE_SIZE, "%u\n", dtr_rts);
-}
-#endif /* CONFIG_USB_ANDROID_SHARP_CUST */
-
 CONFIGFS_ATTR(usb_cser_, status);
-#ifdef CONFIG_USB_ANDROID_SHARP_CUST
-CONFIGFS_ATTR_RO(usb_cser_, dtr_rts);
-#endif /* CONFIG_USB_ANDROID_SHARP_CUST */
 static struct configfs_attribute *cserial_attrs[] = {
 	&usb_cser_attr_status,
-#ifdef CONFIG_USB_ANDROID_SHARP_CUST
-	&usb_cser_attr_dtr_rts,
-#endif /* CONFIG_USB_ANDROID_SHARP_CUST */
 	NULL,
 };
 

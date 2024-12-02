@@ -201,10 +201,7 @@
 		qcom,clock-rates = <24000000 0>;
 	};
 
-/* SH_BSP_CUST Mod Start */
-//	qcom,camera@1 {
-	camera1: qcom,camera@1 {
-/* SH_BSP_CUST Mod End */
+	qcom,camera@1 {
 		cell-index = <1>;
 		compatible = "qcom,camera";
 		reg = <0x1>;

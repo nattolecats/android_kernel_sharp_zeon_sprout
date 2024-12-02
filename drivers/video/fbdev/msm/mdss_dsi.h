@@ -411,10 +411,6 @@ struct mdss_dsi_ctrl_pdata {
 	int (*check_read_status)(struct mdss_dsi_ctrl_pdata *pdata);
 	int (*cmdlist_commit)(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp);
 	void (*switch_mode)(struct mdss_panel_data *pdata, int mode);
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00019 */
-	void (*update_info) (struct mdss_panel_data *pdata,
-					struct mdp_mipi_clkchg_param *);
-#endif /* CONFIG_SHARP_DISPLAY */
 	struct mdss_panel_data panel_data;
 	unsigned char __iomem *ctrl_base;
 	struct mdss_io_data ctrl_io;
@@ -447,10 +443,6 @@ struct mdss_dsi_ctrl_pdata {
 	int intf_mux_gpio;
 	bool bklt_en_gpio_invert;
 	int lcd_mode_sel_gpio;
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00003, CUST_ID_00004 */
-	int panel_vddio_gpio;
-	int tp_rst_gpio;
-#endif /* CONFIG_SHARP_DISPLAY */
 	int bklt_ctrl;	/* backlight ctrl */
 	enum dsi_ctrl_op_mode bklt_dcs_op_mode; /* backlight dcs ctrl mode */
 	bool pwm_pmi;
@@ -493,10 +485,6 @@ struct mdss_dsi_ctrl_pdata {
 	struct dsi_panel_cmds status_cmds;
 	struct dsi_panel_cmds idle_on_cmds; /* for lp mode */
 	struct dsi_panel_cmds idle_off_cmds;
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00011 */
-	struct dsi_panel_cmds panel_typ_volt_cmds;
-	struct dsi_panel_cmds panel_typ_gmm_cmds;
-#endif /* CONFIG_SHARP_DISPLAY */
 	u32 *status_valid_params;
 	u32 *status_cmds_rlen;
 	u32 *status_value;
@@ -579,9 +567,6 @@ struct mdss_dsi_ctrl_pdata {
 	bool update_phy_timing; /* flag to recalculate PHY timings */
 
 	bool phy_power_off;
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00041 */
-	int recovery_cnt;
-#endif /* CONFIG_SHARP_DISPLAY */
 };
 
 struct dsi_status_data {
@@ -613,12 +598,6 @@ int mdss_dsi_clk_ctrl(struct mdss_dsi_ctrl_pdata *ctrl, void *clk_handle,
 	enum mdss_dsi_clk_type clk_type, enum mdss_dsi_clk_state clk_state);
 void mdss_dsi_clk_req(struct mdss_dsi_ctrl_pdata *ctrl,
 	struct dsi_panel_clk_ctrl *clk_ctrl);
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00019 */
-void __mdss_dsi_update_video_mode_total_wrap(struct mdss_panel_data *pdata,
-		int new_fps);
-void __mdss_dsi_mask_dfps_errors_wrap(struct mdss_dsi_ctrl_pdata *ctrl,
-		bool mask);
-#endif /* CONFIG_SHARP_DISPLAY */
 void mdss_dsi_controller_cfg(int enable,
 				struct mdss_panel_data *pdata);
 void mdss_dsi_sw_reset(struct mdss_dsi_ctrl_pdata *ctrl_pdata, bool restore);
@@ -933,9 +912,5 @@ static inline bool mdss_dsi_cmp_panel_reg(struct dsi_buf status_buf,
 {
 	return status_buf.data[i] == status_val[i];
 }
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00003 */
-int mdss_dsi_enable_panel_vddio_gpio(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
-		int enable);
-#endif /* CONFIG_SHARP_DISPLAY */
 
 #endif /* MDSS_DSI_H */

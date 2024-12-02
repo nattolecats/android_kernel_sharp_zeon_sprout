@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, 2021, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -25,13 +25,6 @@
 #include "mdss_panel.h"
 #include "mdss_debug.h"
 #include "mdss_mdp_trace.h"
-
-#ifdef CONFIG_SHARP_DISPLAY  /* CUST_ID_0007 */
-#include "mdss_dsi.h"
-#endif /* CUST_ID_0007 */
-#ifdef CONFIG_SHARP_BOOT /* CUST_ID_00010 */
-#include <soc/qcom/sharp/sh_boot_manager.h>
-#endif /* CONFIG_SHARP_BOOT */ /* CUST_ID_00010 */
 
 /* wait for at least 2 vsyncs for lowest refresh rate (24hz) */
 #define VSYNC_TIMEOUT_US 100000
@@ -105,9 +98,6 @@ struct mdss_mdp_video_ctx {
 	u32 intf_irq_mask;
 	spinlock_t mdss_mdp_video_lock;
 	spinlock_t mdss_mdp_intf_intr_lock;
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00024 */
-	bool dfps_updating;
-#endif /* CONFIG_SHARP_DISPLAY */
 };
 
 static void mdss_mdp_fetch_start_config(struct mdss_mdp_video_ctx *ctx,
@@ -117,13 +107,6 @@ static void mdss_mdp_fetch_end_config(struct mdss_mdp_video_ctx *ctx,
 		struct mdss_mdp_ctl *ctl);
 
 static void early_wakeup_dfps_update_work(struct work_struct *work);
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00019 */
-static int mdss_mdp_video_config_mipiclk(struct mdss_mdp_ctl *ctl,
-		struct mdp_mipi_clkchg_param *request_mipiclk);
-static int mdss_mdp_video_config_mipiclk_chg(struct mdss_mdp_ctl *ctl,
-		struct mdp_mipi_clkchg_param *request_mipiclk);
-#endif /* CONFIG_SHARP_DISPLAY */
 
 static inline void mdp_video_write(struct mdss_mdp_video_ctx *ctx,
 				   u32 reg, u32 val)
@@ -1359,9 +1342,6 @@ static int mdss_mdp_video_config_fps(struct mdss_mdp_ctl *ctl, int new_fps)
 		goto end;
 	}
 
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00024 */
-	ctx->dfps_updating = true;
-#endif /* CONFIG_SHARP_DISPLAY */
 	pr_debug("ctl:%d dfps_update:%d fps:%d\n",
 		ctl->num, pdata->panel_info.dfps_update, new_fps);
 	MDSS_XLOG(ctl->num, pdata->panel_info.dfps_update,
@@ -1442,13 +1422,6 @@ static int mdss_mdp_video_config_fps(struct mdss_mdp_ctl *ctl, int new_fps)
 					mdss_mdp_fetch_end_config(sctx, ctl);
 			}
 
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00030 */
-			/*
-			 * Make sure controller setting committed
-			 */
-			wmb();
-#endif /* CONFIG_SHARP_DISPLAY */
-
 			/*
 			 * Make sure controller setting committed
 			 */
@@ -1495,9 +1468,6 @@ exit_dfps:
 	}
 
 end:
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00024 */
-	ctx->dfps_updating = false;
-#endif /* CONFIG_SHARP_DISPLAY */
 	MDSS_XLOG(ctl->num, new_fps, XLOG_FUNC_EXIT);
 	mutex_unlock(&ctl->offlock);
 	return rc;
@@ -1529,6 +1499,11 @@ static int mdss_mdp_video_display(struct mdss_mdp_ctl *ctl, void *arg)
 	MDSS_XLOG(ctl->num, ctl->underrun_cnt);
 
 	if (!ctx->timegen_en) {
+		rc = mdss_iommu_ctrl(1);
+		if (IS_ERR_VALUE((unsigned long)rc)) {
+			pr_err("IOMMU attach failed\n");
+			return rc;
+		}
 		rc = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_LINK_READY, NULL,
 			CTL_INTF_EVENT_FLAG_DEFAULT);
 		if (rc) {
@@ -1549,12 +1524,6 @@ static int mdss_mdp_video_display(struct mdss_mdp_ctl *ctl, void *arg)
 			!ctl->mfd->splash_info.splash_logo_enabled) {
 			rc = wait_for_completion_timeout(&ctx->vsync_comp,
 					usecs_to_jiffies(VSYNC_TIMEOUT_US));
-		}
-
-		rc = mdss_iommu_ctrl(1);
-		if (IS_ERR_VALUE((unsigned long)rc)) {
-			pr_err("IOMMU attach failed\n");
-			return rc;
 		}
 
 		mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON);
@@ -2234,26 +2203,10 @@ static int mdss_mdp_video_early_wake_up(struct mdss_mdp_ctl *ctl)
 	 */
 	if (ctl->panel_data && ctl->panel_data->panel_info.dynamic_fps) {
 		struct mdss_mdp_video_ctx *ctx;
-#ifdef CONFIG_SHARP_BOOT /* CUST_ID_00010 */
-		int bootmode;
 
-		bootmode = sh_boot_get_bootmode();
-		if ((bootmode == SH_BOOT_D) || (bootmode == SH_BOOT_F_F)) {
-			pr_debug("%s: bootmode is diag \n", __func__);
-			return 0;
-		}
-		pr_debug("%s: bootmode is not diag \n", __func__);
-#endif /* CONFIG_SHARP_BOOT */ /* CUST_ID_00010 */
 		ctx = ctl->intf_ctx[MASTER_CTX];
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00024 */
-		if (ctx && !ctx->dfps_updating) {
-			/* don't schedule the workqueue during dfps updating */
-			schedule_work(&ctx->early_wakeup_dfps_work);
-		}
-#else /* CONFIG_SHARP_DISPLAY */
 		if (ctx)
 			schedule_work(&ctx->early_wakeup_dfps_work);
-#endif /* CONFIG_SHARP_DISPLAY */
 	}
 
 	return 0;
@@ -2281,9 +2234,6 @@ int mdss_mdp_video_start(struct mdss_mdp_ctl *ctl)
 	ctl->ops.early_wake_up_fnc = mdss_mdp_video_early_wake_up;
 	ctl->ops.update_lineptr = mdss_mdp_video_lineptr_ctrl;
 	ctl->ops.wait_for_vsync_fnc = NULL;
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00019 */
-	ctl->ops.config_mipiclk_fnc = mdss_mdp_video_config_mipiclk;
-#endif /* CONFIG_SHARP_DISPLAY */
 
 	return 0;
 }
@@ -2296,330 +2246,3 @@ void *mdss_mdp_get_intf_base_addr(struct mdss_data_type *mdata,
 	ctx = ((struct mdss_mdp_video_ctx *) mdata->video_intf) + interface_id;
 	return (void *)(ctx->base);
 }
-
-#ifdef CONFIG_SHARP_DISPLAY  /* CUST_ID_0007 */
-void mdss_mdp_video_transfer_ctrl(struct mdss_mdp_ctl *ctl, int onoff)
-{
-	struct mdss_mdp_video_ctx *ctx, *sctx = NULL;
-	struct mdss_panel_data *pdata;
-	struct mdss_dsi_ctrl_pdata *ctrl_pdata, *sctrl_pdata = NULL;
-	struct mdss_mdp_ctl *sctl = NULL;
-
-	if (!ctl) {
-		pr_err("invalid ctl\n");
-		return;
-	}
-
-	ctx = (struct mdss_mdp_video_ctx *) ctl->intf_ctx[MASTER_CTX];
-	if (!ctx) {
-		pr_err("invalid ctx\n");
-		return;
-	}
-
-	pdata = ctl->panel_data;
-	if (!pdata) {
-		pr_err("invalid pdata\n");
-		return;
-	}
-
-	sctl = mdss_mdp_get_split_ctl(ctl);
-	if (sctl) {
-		sctx = (struct mdss_mdp_video_ctx *) sctl->intf_ctx[MASTER_CTX];
-	} else if (ctl->panel_data->next && is_pingpong_split(ctl->mfd)) {
-		sctx = (struct mdss_mdp_video_ctx *) ctl->intf_ctx[SLAVE_CTX];
-	}
-
-	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
-				panel_data);
-	if (pdata->next) {
-		sctrl_pdata = container_of(pdata->next, struct mdss_dsi_ctrl_pdata, panel_data);
-	}
-
-	if (onoff) {
-		mdp_video_write(ctx, MDSS_MDP_REG_INTF_TIMING_ENGINE_EN, 1);
-		if (sctx) {
-			mdp_video_write(sctx,
-				MDSS_MDP_REG_INTF_TIMING_ENGINE_EN, 1);
-		}
-		wmb();
-		ctrl_pdata->ctrl_state |= CTRL_STATE_MDP_ACTIVE;
-		if (sctrl_pdata) {
-			sctrl_pdata->ctrl_state |= CTRL_STATE_MDP_ACTIVE;
-		}
-	} else {
-		mdp_video_write(ctx, MDSS_MDP_REG_INTF_TIMING_ENGINE_EN, 0);
-		if (sctx) {
-			mdp_video_write(sctx,
-				MDSS_MDP_REG_INTF_TIMING_ENGINE_EN, 0);
-		}
-		wmb();
-		if (pdata->panel_info.is_split_display) {
-			msleep(10);
-		} else {
-			msleep(20);
-		}
-		ctrl_pdata->ctrl_state &= ~CTRL_STATE_MDP_ACTIVE;
-		if (sctrl_pdata) {
-			sctrl_pdata->ctrl_state &= ~CTRL_STATE_MDP_ACTIVE;
-		}
-		mdss_dsi_controller_cfg(true, pdata);
-		if (pdata->next) {
-			mdss_dsi_controller_cfg(true, pdata->next);
-		}
-	}
-}
-#endif /* CUST_ID_0007 */
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00011 *//* CUST_ID_00019 */
-static void mdss_mdp_video_force_clk_hs_ctrl(struct mdss_panel_data *pdata, int onoff)
-{
-	u32 tmp;
-	struct mdss_dsi_ctrl_pdata *ctrl_pdata;
-
-	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
-				panel_data);
-
-	tmp = MIPI_INP((ctrl_pdata->ctrl_base) + 0xac);
-	if (onoff) {
-		tmp |= (1<<28);
-	} else {
-		tmp &= ~(1<<28);
-	}
-	MIPI_OUTP((ctrl_pdata->ctrl_base) + 0xac, tmp);
-	wmb();
-}
-
-static int mdss_mdp_video_timegen_refresh(struct mdss_mdp_ctl *ctl)
-{
-	unsigned long flags;
-	int rc = 0;
-	int new_fps = 0;
-	struct mdss_data_type *mdata;
-	struct mdss_mdp_video_ctx *ctx = NULL;
-	struct mdss_mdp_video_ctx *sctx = NULL;
-	struct mdss_mdp_ctl *sctl = NULL;
-	struct mdss_panel_data *pdata;
-	struct mdss_panel_info *pinfo;
-
-	/* add HW recommended delay to handle panel_vsync */
-	udelay(2000);
-
-	pr_debug("%s in\n", __func__);
-	ctx = (struct mdss_mdp_video_ctx *) ctl->intf_ctx[MASTER_CTX];
-	pdata = ctl->panel_data;
-	pinfo = &pdata->panel_info;
-	new_fps = pinfo->mipi.frame_rate;
-	mdata = ctl->mdata;
-	sctl = mdss_mdp_get_split_ctl(ctl);
-	if (sctl) {
-		sctx = (struct mdss_mdp_video_ctx *) sctl->intf_ctx[MASTER_CTX];
-		if (!sctx) {
-			pr_err("invalid ctx\n");
-			return -ENODEV;
-		}
-	} else if (is_pingpong_split(ctl->mfd)) {
-		sctx = (struct mdss_mdp_video_ctx *) ctl->intf_ctx[SLAVE_CTX];
-		if (!sctx || !sctx->ref_cnt) {
-			pr_err("invalid sctx or interface is powered off\n");
-			return -EINVAL;
-		}
-	}
-
-	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON);
-
-	spin_lock_irqsave(&ctx->dfps_lock, flags);
-
-	if (mdata->mdp_rev < MDSS_MDP_HW_REV_105) {
-		rc = mdss_mdp_video_dfps_check_line_cnt(ctl);
-		if (rc < 0) {
-			pr_err("%s: DFPS line count error\n", __func__);
-			goto exit_dfps;
-		}
-	}
-
-	rc = mdss_mdp_video_hfp_fps_update(ctx, pdata);
-	if (rc < 0) {
-		pr_err("%s: Error during DFPS: %d\n", __func__, new_fps);
-	}
-	if (sctx && pdata->next) {
-		rc = mdss_mdp_video_hfp_fps_update(sctx, pdata->next);
-		if (rc < 0) {
-			pr_err("%s: DFPS error fps:%d\n", __func__, new_fps);
-		}
-	}
-	__mdss_dsi_update_video_mode_total_wrap(pdata, new_fps);
-	if (pdata->next) {
-		__mdss_dsi_update_video_mode_total_wrap(pdata->next, new_fps);
-	}
-
-	WARN(rc, "intf %d panel fps update error (%d)\n",
-					ctl->intf_num, rc);
-
-	rc = 0;
-	mdss_mdp_fetch_start_config(ctx, ctl);
-	if (sctx) {
-		mdss_mdp_fetch_start_config(sctx, ctl);
-	}
-
-	/*
-	 * Make sure controller setting committed
-	 */
-	wmb();
-
-	/*
-	 * MDP INTF registers support DB on targets
-	 * starting from MDP v1.5.
-	 */
-	if (mdata->mdp_rev >= MDSS_MDP_HW_REV_105)
-		mdss_mdp_video_timegen_flush(ctl, sctx);
-
-exit_dfps:
-	spin_unlock_irqrestore(&ctx->dfps_lock, flags);
-	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
-
-	/*
-	 * Wait for one vsync to make sure these changes
-	 * are applied as part of one single frame and
-	 * no mixer changes happen at the same time.
-	 * A potential optimization would be not to wait
-	 * here, but next mixer programming would need
-	 * to wait before programming the flush bits.
-	 */
-	if (!rc) {
-		rc = mdss_mdp_video_wait4vsync(ctl);
-		if (rc < 0)
-			pr_err("Error in dfps_wait: %d\n", rc);
-	}
-
-	pr_debug("%s out : rc=%d\n", __func__, rc);
-	return rc;
-}
-
-int mdss_mdp_update_panel_timing(struct mdss_dsi_ctrl_pdata *ctrl,
-			mdp_mipi_clkchg_panel_t *panel_data)
-{
-	int ret = 0;
-	struct dcs_cmd_req cmdreq;
-	int i;
-	unsigned char dsi_value[6];
-	unsigned char osc_value[11];
-	struct dsi_cmd_desc paneltiming_cmd[] = {
-		{{DTYPE_DCS_LWRITE, 0, 0, 0, 1,  6}, dsi_value },
-		{{DTYPE_DCS_LWRITE, 1, 0, 0, 1, 11}, osc_value }
-	};
-
-	pr_debug("%s:in\n", __func__);
-
-	dsi_value[0] = 0xB6;
-	for (i = 1;i < sizeof(dsi_value);i++) {
-		dsi_value[i] = panel_data->DSI[i-1];
-	}
-	osc_value[0] = 0xC0;
-	for (i = 1;i < sizeof(osc_value);i++) {
-		osc_value[i] = panel_data->OSC[i-1];
-	}
-
-	memset(&cmdreq, 0, sizeof(cmdreq));
-	cmdreq.cmds = paneltiming_cmd;
-	cmdreq.cmds_cnt = ARRAY_SIZE(paneltiming_cmd);
-	cmdreq.flags = CMD_REQ_COMMIT | CMD_CLK_CTRL | CMD_REQ_HS_MODE;
-	cmdreq.rlen = 0;
-	cmdreq.cb = NULL;
-	ret = mdss_dsi_cmdlist_put(ctrl, &cmdreq);
-
-	pr_debug("%s:out ret=%d\n", __func__, ret);
-	if (ret > 0) {
-		ret = 0;
-	} else {
-		ret = -EIO;
-	}
-	return ret;
-}
-
-static int mdss_mdp_video_config_mipiclk(struct mdss_mdp_ctl *ctl,
-	struct mdp_mipi_clkchg_param *request_mipiclk)
-{
-	int rc = 0;
-	struct mdss_mdp_video_ctx *ctx = NULL;
-
-	ctx = (struct mdss_mdp_video_ctx *) ctl->intf_ctx[MASTER_CTX];
-	if (!ctx) {
-		pr_err("invalid ctx\n");
-		return -EINVAL;
-	}
-	mutex_lock(&ctl->offlock);
-	ctx->dfps_updating = true;
-	rc = mdss_mdp_video_config_mipiclk_chg(ctl, request_mipiclk);
-	ctx->dfps_updating = false;
-	mutex_unlock(&ctl->offlock);
-	return rc;
-}
-
-static int mdss_mdp_video_config_mipiclk_chg(struct mdss_mdp_ctl *ctl,
-	struct mdp_mipi_clkchg_param *request_mipiclk)
-{
-	int rc = 0;
-	struct mdss_panel_data *pdata;
-	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
-	struct mdss_dsi_ctrl_pdata *sctrl_pdata = NULL;
-	struct mdss_panel_info *pinfo = NULL;
-
-	pr_debug("%s: ctl=%d\n", __func__, ctl->num);
-	pdata = ctl->panel_data;
-	pinfo = &(pdata->panel_info);
-	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
-				panel_data);
-	if (pdata->next) {
-		sctrl_pdata = container_of(pdata->next, struct mdss_dsi_ctrl_pdata, panel_data);
-	}
-
-	if(pinfo->clk_rate != request_mipiclk->host.clock_rate) {
-		if (pinfo->clk_rate == 466000000 || request_mipiclk->host.clock_rate == 466000000) {
-			rc = mdss_mdp_update_panel_timing(ctrl_pdata, &(request_mipiclk->panel));
-			if (rc) {
-				pr_err("%s: failed to update panel timing.rc=%d\n",
-					 __func__, rc);
-				return rc;
-			}
-		}
-	}
-	mdss_mdp_video_transfer_ctrl(ctl, false);
-
-	rc = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_MIPICLK_UPDATE_CLK,
-		&ctl->request_mipiclk, CTL_INTF_EVENT_FLAG_DEFAULT);
-	if (rc) {
-		pr_err("%s: failed to update dsi mipi clk, intf #%d, rc=%d\n",
-			 __func__, ctl->intf_num, rc);
-		return rc;
-	}
-
-	rc = mdss_mdp_ctl_intf_event(ctl, MDSS_EVENT_MIPICLK_CONFIG_DSI,
-		&ctl->request_mipiclk, CTL_INTF_EVENT_FLAG_DEFAULT);
-	if (rc) {
-		pr_err("%s: failed to update dsi mipi clk, intf #%d, rc=%d\n",
-			 __func__, ctl->intf_num, rc);
-		return rc;
-	}
-
-	__mdss_dsi_mask_dfps_errors_wrap(ctrl_pdata, true);
-	if (sctrl_pdata) {
-		__mdss_dsi_mask_dfps_errors_wrap(sctrl_pdata, true);
-	}
-
-	if (pdata->panel_info.mipi.force_clk_lane_hs) {
-		mdss_mdp_video_force_clk_hs_ctrl(pdata, true);
-	}
-
-	mdss_mdp_video_transfer_ctrl(ctl, true);
-
-	rc = mdss_mdp_video_timegen_refresh(ctl);
-
-	__mdss_dsi_mask_dfps_errors_wrap(ctrl_pdata, false);
-	if (sctrl_pdata) {
-		__mdss_dsi_mask_dfps_errors_wrap(sctrl_pdata, false);
-	}
-
-	pr_debug("%s:out ret=%d\n", __func__, rc);
-	return rc;
-}
-#endif /* CONFIG_SHARP_DISPLAY */

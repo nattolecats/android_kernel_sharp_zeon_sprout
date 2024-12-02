@@ -528,12 +528,6 @@ struct mdss_data_type {
 	u32 splash_intf_sel;
 	u32 splash_split_disp;
 	struct mult_factor bus_throughput_factor;
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_0006 */
-	int upper_unit_is_connected;
-#endif /* CONFIG_SHARP_DISPLAY */
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00022 */
-	struct mdp_panel_otp_info panel_otp_info;
-#endif /* CONFIG_SHARP_DISPLAY */
 };
 
 extern struct mdss_data_type *mdss_res;

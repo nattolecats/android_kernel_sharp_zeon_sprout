@@ -46,9 +46,6 @@
 #include <linux/file.h>
 #include <linux/kthread.h>
 #include <linux/dma-buf.h>
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00018 */
-#include <linux/thermal.h>
-#endif /* CONFIG_SHARP_DISPLAY */
 #include "mdss_fb.h"
 #include "mdss_mdp_splash_logo.h"
 #define CREATE_TRACE_POINTS
@@ -57,29 +54,6 @@
 #include "mdss_mdp.h"
 #include "mdp3_ctrl.h"
 #include "mdss_sync.h"
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00011 */
-#include "mdss_diag.h"
-#endif /* CONFIG_SHARP_DISPLAY */
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00005 */
-#ifdef CONFIG_SHARP_BOOT
-#include <soc/qcom/sharp/sh_boot_manager.h>
-#endif /* CONFIG_SHARP_BOOT */
-#endif /* CONFIG_SHARP_DISPLAY */
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_0006 */
-#include "msm_mdss_context.h"
-#ifdef CONFIG_SHARP_DISPLAY  /* CUST_ID_0007 */
-#include "mdss_proc.h"
-#endif /* CONFIG_SHARP_DISPLAY */ /* CUST_ID_0007 */
-#endif /* CONFIG_SHARP_DISPLAY */
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00021 */
-#ifdef CONFIG_SHARP_SHTERM
-#include <misc/shterm_k.h>
-#endif /* CONFIG_SHARP_SHTERM */
-#endif /* CONFIG_SHARP_DISPLAY */
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00022 */
-#include <soc/qcom/sh_smem.h>
-#endif /* CONFIG_SHARP_DISPLAY */
 
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MDSS_FB_NUM 3
@@ -147,10 +121,6 @@ static int mdss_fb_send_panel_event(struct msm_fb_data_type *mfd,
 					int event, void *arg);
 static void mdss_fb_set_mdp_sync_pt_threshold(struct msm_fb_data_type *mfd,
 		int type);
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00041 */
-extern int mdss_dsi_host_is_retry_over(void);
-#endif /* CONFIG_SHARP_DISPLAY */
-
 void mdss_fb_no_update_notify_timer_cb(unsigned long data)
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)data;
@@ -321,15 +291,6 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 	if (value > mfd->panel_info->brightness_max)
 		value = mfd->panel_info->brightness_max;
 
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00018 */
-	mfd->panel_info->request_brightness = value;
-	if (value > mfd->panel_info->thermal_limit) {
-		value = mfd->panel_info->thermal_limit;
-	}
-	led_cdev->brightness = value;
-	pr_debug("%s:set brightness=%d\n", __func__, value);
-#endif /* CONFIG_SHARP_DISPLAY */
-
 	/* This maps android backlight level 0 to 255 into
 	 * driver backlight level 0 to bl_max with rounding
 	 */
@@ -366,78 +327,6 @@ static struct led_classdev backlight_led = {
 	.brightness_get = mdss_fb_get_bl_brightness,
 	.max_brightness = MDSS_MAX_BL_BRIGHTNESS,
 };
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00018 */
-static int mdss_fb_cdev_get_max_brightness(struct thermal_cooling_device *cdev,
-						unsigned long *state)
-{
-	struct led_classdev *led_cdev = &backlight_led;
-	struct msm_fb_data_type *mfd = dev_get_drvdata(led_cdev->dev->parent);
-
-	*state = mfd->panel_info->brightness_max;
-	pr_debug("%s: max_brightness=%d\n", __func__,
-			mfd->panel_info->brightness_max);
-
-	return 0;
-}
-
-static int mdss_fb_cdev_get_cur_brightness(struct thermal_cooling_device *cdev,
-						unsigned long *state)
-{
-	struct led_classdev *led_cdev = &backlight_led;
-	struct msm_fb_data_type *mfd = dev_get_drvdata(led_cdev->dev->parent);
-
-	*state = mfd->panel_info->brightness_max -
-			mfd->panel_info->thermal_limit;
-	pr_debug("%s: thermal_limit=%d\n", __func__,
-			mfd->panel_info->thermal_limit);
-
-	return 0;
-}
-
-static int mdss_fb_cdev_set_cur_brightness(struct thermal_cooling_device *cdev,
-						unsigned long state)
-{
-	struct led_classdev *led_cdev = &backlight_led;
-	struct msm_fb_data_type *mfd = dev_get_drvdata(led_cdev->dev->parent);
-	int brightness_lvl;
-
-	brightness_lvl = mfd->panel_info->brightness_max - state;
-	if (brightness_lvl == mfd->panel_info->thermal_limit) {
-		return 0;
-	}
-
-	mfd->panel_info->thermal_limit = brightness_lvl;
-	pr_debug("%s:set thermal_limit=%d\n", __func__,
-			mfd->panel_info->thermal_limit);
-
-	brightness_lvl = mfd->panel_info->request_brightness;
-	mdss_fb_set_bl_brightness(led_cdev, brightness_lvl);
-
-	return 0;
-}
-
-static struct thermal_cooling_device_ops mdss_fb_cdev_ops = {
-	.get_max_state = mdss_fb_cdev_get_max_brightness,
-	.get_cur_state = mdss_fb_cdev_get_cur_brightness,
-	.set_cur_state = mdss_fb_cdev_set_cur_brightness,
-};
-
-static void mdss_fb_backlight_cdev_register(struct device *parent,
-					struct msm_fb_data_type *mfd)
-{
-	pr_debug("%s: in\n", __func__);
-	if (of_find_property(parent->of_node, "#cooling-cells", NULL)) {
-		mfd->tcdev = thermal_of_cooling_device_register(parent->of_node,
-				  "panel0-backlight", mfd, &mdss_fb_cdev_ops);
-		if (!mfd->tcdev)
-			pr_err("%s: Cooling device register failed\n", __func__);
-	}
-	else{
-		pr_err("%s: #cooling-cells not found!", __func__);
-	}
-}
-#endif /* CONFIG_SHARP_DISPLAY */
 
 static ssize_t mdss_fb_get_type(struct device *dev,
 				struct device_attribute *attr, char *buf)
@@ -1355,9 +1244,6 @@ static int mdss_fb_probe(struct platform_device *pdev)
 	struct fb_info *fbi;
 	int rc;
 	const char *data;
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00018 */
-	struct thermal_cooling_device *tcdev;
-#endif /* CONFIG_SHARP_DISPLAY */
 
 	if (fbi_list_index >= MAX_FBI_LIST)
 		return -ENOMEM;
@@ -1479,13 +1365,6 @@ static int mdss_fb_probe(struct platform_device *pdev)
 			pr_err("led_classdev_register failed\n");
 		else
 			lcd_backlight_registered = 1;
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00018 */
-		tcdev = kzalloc(sizeof(struct thermal_cooling_device), GFP_KERNEL);
-		mfd->tcdev = tcdev;
-		mdss_fb_backlight_cdev_register(&pdev->dev, mfd);
-		mfd->panel_info->thermal_limit =
-					mfd->panel_info->brightness_max;
-#endif /* CONFIG_SHARP_DISPLAY */
 	}
 
 	mdss_fb_init_panel_modes(mfd, pdata);
@@ -1526,20 +1405,7 @@ static int mdss_fb_probe(struct platform_device *pdev)
 		(mfd->panel_info->type == MIPI_VIDEO_PANEL)))
 		if (mdss_fb_register_input_handler(mfd))
 			pr_err("failed to register input handler\n");
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_0007 */
-	if ((mfd->panel_info->type == MIPI_CMD_PANEL) ||
-	    (mfd->panel_info->type == MIPI_VIDEO_PANEL)) {
-		mdss_proc_init(mfd);
-	}
-#endif /* CONFIG_SHARP_DISPLAY */
 
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00011 */
-	if ((mfd->panel_info->type == MIPI_CMD_PANEL) ||
-	    (mfd->panel_info->type == MIPI_VIDEO_PANEL)) {
-		pr_debug("%s, call mdss_diag_init \n",__func__ );
-		mdss_diag_init(mfd);
-	}
-#endif /* CONFIG_SHARP_DISPLAY */
 	INIT_DELAYED_WORK(&mfd->idle_notify_work, __mdss_fb_idle_notify_work);
 
 	return rc;
@@ -1850,21 +1716,7 @@ void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 	bool ad_bl_notify_needed = false;
 	bool bl_notify_needed = false;
 	bool twm_en = false;
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00021 */
-#ifdef CONFIG_SHARP_SHTERM
-	bool bkl_on = false;
-	int ret = 0;
-#endif /* CONFIG_SHARP_SHTERM */
-#endif /* CONFIG_SHARP_DISPLAY */
 
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_0006 */
-	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
-
-	if ((mdata != NULL) && (mdata->upper_unit_is_connected == MDSS_UPPER_UNIT_IS_NOT_CONNECTED)) {
-		pr_debug("%s: upper unit is not connected\n", __func__);
-		return;
-	}
-#endif /* CONFIG_SHARP_DISPLAY */
 	if ((((mdss_fb_is_power_off(mfd) && mfd->dcm_state != DCM_ENTER)
 		|| !mfd->allow_bl_update) && !IS_CALIB_MODE_BL(mfd) &&
 		!mfd->allow_secure_bl_update) ||
@@ -1876,16 +1728,6 @@ void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 	} else if (!mfd->allow_secure_bl_update) {
 		mfd->unset_bl_level = U32_MAX;
 	}
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00021 */
-#ifdef CONFIG_SHARP_SHTERM
-	bkl_on = bkl_lvl > 0 ? true : false;
-	ret = shterm_k_set_info(SHTERM_INFO_BACKLIGHT, bkl_on);
-	if (ret != SHTERM_SUCCESS) {
-		pr_err("%s[%d] shterm_k_set_info() error.",__func__, __LINE__);
-	}
-#endif /* CONFIG_SHARP_SHTERM */
-#endif /* CONFIG_SHARP_DISPLAY */
 
 	pdata = dev_get_platdata(&mfd->pdev->dev);
 
@@ -1939,14 +1781,6 @@ void mdss_fb_update_backlight(struct msm_fb_data_type *mfd)
 	u32 temp;
 	bool bl_notify = false;
 
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_0006 */
-	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
-
-	if ((mdata != NULL) && (mdata->upper_unit_is_connected == MDSS_UPPER_UNIT_IS_NOT_CONNECTED)) {
-		pr_debug("%s: upper unit is not connected\n", __func__);
-		return;
-	}
-#endif /* CONFIG_SHARP_DISPLAY */
 	if (mfd->unset_bl_level == U32_MAX)
 		return;
 	mutex_lock(&mfd->bl_lock);
@@ -2117,16 +1951,6 @@ static int mdss_fb_blank_unblank(struct msm_fb_data_type *mfd)
 	if (!mfd)
 		return -EINVAL;
 
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00041 */
-	if (mfd->index == 0) {
-		if (mdss_dsi_host_is_retry_over()) {
-			pr_warn("%s: panel is dead. unblank through\n",
-							__func__);
-			return -EFAULT;
-		}
-	}
-#endif /* CONFIG_SHARP_DISPLAY */
-
 	if (mfd->panel_info->debugfs_info)
 		mdss_panel_validate_debugfs_info(mfd);
 
@@ -2216,26 +2040,13 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 	int ret = 0;
 	int cur_power_state, req_power_state = MDSS_PANEL_POWER_OFF;
 	char trace_buffer[32];
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_0006 */
-	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
-#endif /* CONFIG_SHARP_DISPLAY */
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00021 */
-#ifdef CONFIG_SHARP_SHTERM
-	int shterm_ret = 0;
-#endif /* CONFIG_SHARP_SHTERM */
-#endif /* CONFIG_SHARP_DISPLAY */
 
 	if (!mfd || !op_enable)
 		return -EPERM;
 
 	if (mfd->dcm_state == DCM_ENTER)
 		return -EPERM;
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_0006 */
-	if ((mdata != NULL) && (mdata->upper_unit_is_connected == MDSS_UPPER_UNIT_IS_NOT_CONNECTED)) {
-		pr_debug("%s: upper unit is not connected\n", __func__);
-		return 0;
-	}
-#endif /* CONFIG_SHARP_DISPLAY */
+
 	pr_debug("%pS mode:%d\n", __builtin_return_address(0),
 		blank_mode);
 
@@ -2315,29 +2126,6 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 
 	/* Notify listeners */
 	sysfs_notify(&mfd->fbi->dev->kobj, NULL, "show_blank_event");
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00021 */
-#ifdef CONFIG_SHARP_SHTERM
-	switch (blank_mode) {
-	case FB_BLANK_UNBLANK:
-		shterm_ret = shterm_k_set_info(SHTERM_INFO_LCDPOW, true);
-		if (shterm_ret != SHTERM_SUCCESS) {
-			pr_err("%s[%d] shterm_k_set_info() error.",__func__, __LINE__);
-		}
-		break;
-	case BLANK_FLAG_ULP:
-	case BLANK_FLAG_LP:
-	case FB_BLANK_HSYNC_SUSPEND:
-	case FB_BLANK_POWERDOWN:
-	default:
-		shterm_ret = shterm_k_set_info(SHTERM_INFO_LCDPOW, false);
-		if (shterm_ret != SHTERM_SUCCESS) {
-			pr_err("%s[%d] shterm_k_set_info() error.",__func__, __LINE__);
-		}
-		break;
-    }
-#endif /* CONFIG_SHARP_SHTERM */
-#endif /* CONFIG_SHARP_DISPLAY */
 
 	ATRACE_END(trace_buffer);
 
@@ -5087,119 +4875,6 @@ static int mdss_fb_mode_switch(struct msm_fb_data_type *mfd, u32 mode)
 	return ret;
 }
 
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00011 */
-static int mdss_fb_mipi_check_ioctl(struct fb_info *info, unsigned long *argp)
-{
-	int ret;
-	struct mdp_mipi_check_param mipi_check_param;
-	struct mdss_panel_data *pdata;
-
-	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
-	pdata = dev_get_platdata(&mfd->pdev->dev);
-
-	ret = copy_from_user(&mipi_check_param, argp, sizeof(mipi_check_param));
-	if (ret) {
-		pr_err("%s:copy from user failed\n", __func__);
-		return ret;
-	}
-	ret = mdss_diag_mipi_check(mfd, &mipi_check_param, pdata);
-
-	if (ret) {
-		pr_err("%s:ioctl failed\n", __func__);
-	} else {
-		ret = copy_to_user(argp, &mipi_check_param, sizeof(mipi_check_param));
-	}
-	return ret;
-}
-#endif /* CONFIG_SHARP_DISPLAY */
-
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00019 */
-int mdss_fb_mipi_clkchg_video(struct msm_fb_data_type *mfd,
-		struct mdp_mipi_clkchg_param *mipi_clkchg_param)
-{
-	int ret = 0;
-	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
-	struct mdss_panel_data *pdata;
-	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
-
-	pr_debug("%s: called fb%d\n", __func__, mfd->index);
-
-	if (mdata->upper_unit_is_connected != MDSS_UPPER_UNIT_IS_CONNECTED) {
-		pr_err("%s: upper_unit isn't connected\n", __func__);
-		return -ENODEV;
-	}
-
-	pdata = ctl->panel_data;
-	if (!pdata) {
-		pr_err("invalid pdata\n");
-		return -ENODEV;
-	}
-
-	mutex_lock(&ctl->mipiclk_lock);
-	memcpy(&ctl->request_mipiclk, mipi_clkchg_param,
-			sizeof(ctl->request_mipiclk));
-
-	ctl->mipiclk_pending = true;
-	mutex_unlock(&ctl->mipiclk_lock);
-
-	return ret;
-}
-
-static int mdss_fb_mipi_clkchg_ioctl(struct msm_fb_data_type *mfd, unsigned long *argp)
-{
-	int ret;
-	struct mdp_mipi_clkchg_param mipi_clkchg_param;
-	struct mdss_data_type *mdata;
-
-	mdata = mfd_to_mdata(mfd);
-	if (!mdata) {
-		pr_err("mdata is NULL or not initialized\n");
-		return -EINVAL;
-	}
-
-	ret = copy_from_user(&mipi_clkchg_param, argp, sizeof(mipi_clkchg_param));
-	if (ret) {
-		pr_err("%s:copy from user failed\n", __func__);
-		return ret;
-	}
-
-	switch (mfd->panel_info->type) {
-	case MIPI_VIDEO_PANEL:
-		ret = mdss_fb_mipi_clkchg_video(mfd, &mipi_clkchg_param);
-		break;
-	case MIPI_CMD_PANEL:
-		pr_err("skip processing, incompatible panel.\n");
-		ret = -ENODEV;
-		break;
-	default:
-		ret = -ENODEV;
-		break;
-	}
-
-	if (ret) {
-		pr_err("%s:ioctl failed\n", __func__);
-	}
-	return ret;
-}
-#endif /* CONFIG_SHARP_DISPLAY */
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00022 */
-static int mdss_fb_get_panel_otp_info(struct msm_fb_data_type *mfd, unsigned long *argp)
-{
-	int ret = 0;
-	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
-
-	if ((mdata != NULL) && (mdata->pan_cfg.init_done != true)) {
-		pr_err("%s: otp is not init\n", __func__);
-		return -EINVAL;
-	}
-
-	ret = copy_to_user(argp, &mdata->panel_otp_info, sizeof(mdata->panel_otp_info));
-	return ret;
-}
-#endif /* CONFIG_SHARP_DISPLAY */
-
 static int __ioctl_wait_idle(struct msm_fb_data_type *mfd, u32 cmd)
 {
 	int ret = 0;
@@ -5231,16 +4906,6 @@ static bool check_not_supported_ioctl(u32 cmd)
 #else
 static bool check_not_supported_ioctl(u32 cmd)
 {
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00005 */
-#ifdef CONFIG_SHARP_BOOT
-	int bootmode;
-
-	bootmode = sh_boot_get_bootmode();
-	if ((bootmode == SH_BOOT_D) || (bootmode == SH_BOOT_F_F)) {
-		return false;
-	}
-#endif /* CONFIG_SHARP_BOOT */
-#endif /* CONFIG_SHARP_DISPLAY */
 	return((cmd == MSMFB_OVERLAY_SET) || (cmd == MSMFB_OVERLAY_UNSET) ||
 		(cmd == MSMFB_OVERLAY_GET) || (cmd == MSMFB_OVERLAY_PREPARE) ||
 		(cmd == MSMFB_DISPLAY_COMMIT) || (cmd == MSMFB_OVERLAY_PLAY) ||
@@ -5345,25 +5010,6 @@ int mdss_fb_do_ioctl(struct fb_info *info, unsigned int cmd,
 	case MSMFB_ASYNC_POSITION_UPDATE:
 		ret = mdss_fb_async_position_update_ioctl(info, argp);
 		break;
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00011 */
-	case MSMFB_MIPI_DSI_CHECK:
-		ret = mdss_fb_mipi_check_ioctl(info, argp);
-		break;
-#endif /* CONFIG_SHARP_DISPLAY */
-
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00019 */
-	case MSMFB_MIPI_DSI_CLKCHG:
-		ret = mdss_fb_mipi_clkchg_ioctl(mfd, argp);
-		break;
-#endif /* CONFIG_SHARP_DISPLAY */
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00022 */
-	case MSMFB_GET_PANEL_OTP_INFO:
-		ret = mdss_fb_get_panel_otp_info(mfd, argp);
-		break;
-#endif /* CONFIG_SHARP_DISPLAY */
 
 	default:
 		if (mfd->mdp.ioctl_handler)
@@ -5624,10 +5270,3 @@ void mdss_fb_idle_pc(struct msm_fb_data_type *mfd)
 		sysfs_notify(&mfd->fbi->dev->kobj, NULL, "idle_power_collapse");
 	}
 }
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00011 */
-struct fb_info *mdss_fb_get_fbinfo(int id)
-{
-	return fbi_list[id];
-}
-#endif /* CONFIG_SHARP_DISPLAY */

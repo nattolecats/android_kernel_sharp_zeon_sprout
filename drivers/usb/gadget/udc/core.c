@@ -839,38 +839,6 @@ out:
 }
 EXPORT_SYMBOL_GPL(usb_gadget_activate);
 
-#ifdef CONFIG_USB_ANDROID_SHARP_CUST
-/**
- * usb_gadget_is_selfpowered - check if the device is selfpowered
- * @gadget:the peripheral being checked
- *
- * Returns true(one) if the device is self-powered.
- * zero if vbus is bus-powered.
- * negative errno without support.
- */
-int usb_gadget_is_selfpowered(struct usb_gadget *gadget)
-{
-	if (!gadget->ops->is_selfpowered)
-		return -EOPNOTSUPP;
-	return gadget->ops->is_selfpowered(gadget);
-}
-EXPORT_SYMBOL_GPL(usb_gadget_is_selfpowered);
-
-/**
- * usb_gadget_force_fullspeed - set fullspeed.
- * @gadget:the device being declared is fullspeed connect
- *
- * returns zero on success, else negative errno.
- */
-int usb_gadget_force_fullspeed( struct usb_gadget *gadget )
-{
-	if (!gadget->ops->set_fullspeed)
-		return -EOPNOTSUPP;
-	return gadget->ops->set_fullspeed(gadget, 1);
-}
-EXPORT_SYMBOL_GPL(usb_gadget_force_fullspeed);
-#endif /* CONFIG_USB_ANDROID_SHARP_CUST */
-
 /* ------------------------------------------------------------------------- */
 
 #ifdef	CONFIG_HAS_DMA
@@ -1340,7 +1308,6 @@ static void usb_gadget_remove_driver(struct usb_udc *udc)
 	usb_gadget_udc_stop(udc);
 
 	udc->driver = NULL;
-	udc->dev.driver = NULL;
 	udc->gadget->dev.driver = NULL;
 }
 
@@ -1388,7 +1355,6 @@ static int udc_bind_to_driver(struct usb_udc *udc, struct usb_gadget_driver *dri
 			driver->function);
 
 	udc->driver = driver;
-	udc->dev.driver = &driver->driver;
 	udc->gadget->dev.driver = &driver->driver;
 
 	ret = driver->bind(udc->gadget, driver);
@@ -1408,7 +1374,6 @@ err1:
 		dev_err(&udc->dev, "failed to start %s: %d\n",
 			udc->driver->function, ret);
 	udc->driver = NULL;
-	udc->dev.driver = NULL;
 	udc->gadget->dev.driver = NULL;
 	return ret;
 }
@@ -1511,10 +1476,13 @@ static ssize_t usb_udc_softconn_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t n)
 {
 	struct usb_udc		*udc = container_of(dev, struct usb_udc, dev);
+	ssize_t			ret;
 
+	mutex_lock(&udc_lock);
 	if (!udc->driver) {
 		dev_err(dev, "soft-connect without a gadget driver\n");
-		return -EOPNOTSUPP;
+		ret = -EOPNOTSUPP;
+		goto out;
 	}
 
 	if (sysfs_streq(buf, "connect")) {
@@ -1526,10 +1494,14 @@ static ssize_t usb_udc_softconn_store(struct device *dev,
 		usb_gadget_udc_stop(udc);
 	} else {
 		dev_err(dev, "unsupported command '%s'\n", buf);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
 
-	return n;
+	ret = n;
+out:
+	mutex_unlock(&udc_lock);
+	return ret;
 }
 static DEVICE_ATTR(soft_connect, S_IWUSR, NULL, usb_udc_softconn_store);
 

@@ -53,7 +53,4 @@ struct msm_spi_platform_data {
 	bool rt_priority;
 	bool use_pinctrl;
 	bool is_shared;
-#if defined( CONFIG_SHARP_SPI_AUTO_SUSPEND )
-	u32  autosuspend_delay;
-#endif	/* CONFIG_SHARP_SPI_AUTO_SUSPEND */
 };

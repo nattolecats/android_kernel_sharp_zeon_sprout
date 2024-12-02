@@ -31,13 +31,6 @@ DEFINE_MSM_MUTEX(msm_actuator_mutex);
 #define PARK_LENS_SMALL_STEP 3
 #define MAX_QVALUE 4096
 
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#ifdef CONFIG_SH_OIS
-extern int32_t sh_ois_fw_wait_complete(void);
-extern struct mutex shcampdaf_mutex;
-#endif /* CONFIG_SH_OIS */
-/* SHLOCAL_CAMERA_DRIVERS<- */
-
 static struct v4l2_file_operations msm_actuator_v4l2_subdev_fops;
 static int32_t msm_actuator_power_up(struct msm_actuator_ctrl_t *a_ctrl);
 static int32_t msm_actuator_power_down(struct msm_actuator_ctrl_t *a_ctrl);
@@ -96,8 +89,6 @@ static int32_t msm_actuator_piezo_set_default_focus(
 static void msm_actuator_parse_i2c_params(struct msm_actuator_ctrl_t *a_ctrl,
 	int16_t next_lens_position, uint32_t hw_params, uint16_t delay)
 {
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#ifndef CONFIG_SH_OIS
 	struct msm_actuator_reg_params_t *write_arr = NULL;
 	uint32_t hw_dword = hw_params;
 	uint16_t i2c_byte1 = 0, i2c_byte2 = 0;
@@ -170,95 +161,6 @@ static void msm_actuator_parse_i2c_params(struct msm_actuator_ctrl_t *a_ctrl,
 		i2c_tbl[a_ctrl->i2c_tbl_index].delay = delay;
 		a_ctrl->i2c_tbl_index++;
 	}
-
-#else  /* CONFIG_SH_OIS */
-	struct msm_camera_i2c_seq_reg_setting conf_sec_array;
-	struct msm_camera_i2c_seq_reg_array reg_sec_setting;
-	int32_t rc = -EFAULT;
-	uint16_t client_addr_type;
-	uint16_t status = 0;
-
-	CDBG("Enter\n");
-	
-	if( a_ctrl->i2c_reg_tbl == NULL)
-		return;
-
-	if(a_ctrl->fw_inited ==0){
-		sh_ois_fw_wait_complete();
-		a_ctrl->fw_inited = 1;
-	}
-
-/* SHLOCAL_CAMERA_DRIVERS-> */
-	mutex_lock(&shcampdaf_mutex);
-/* SHLOCAL_CAMERA_DRIVERS<- */
-
-	conf_sec_array.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
-	conf_sec_array.delay = 0;
-	conf_sec_array.reg_setting = &reg_sec_setting;
-	conf_sec_array.size = 1;
-
-	memset(&reg_sec_setting, 0, sizeof(struct msm_camera_i2c_seq_reg_array));
-
-	reg_sec_setting.reg_addr = 0x3378;
-	reg_sec_setting.reg_data[0] = 0x1C >> 1;  // slave
-	reg_sec_setting.reg_data[1] = 0xF0;
-	reg_sec_setting.reg_data[2] = 0xD0;
-	reg_sec_setting.reg_data[3] = 0x00;
-	reg_sec_setting.reg_data[4] = (next_lens_position & 0x0300) >> 8;
-	reg_sec_setting.reg_data[5] = (next_lens_position & 0x00FF);
-
-	CDBG("reg_sec_setting addr = 0x%04x, reg_data[4]:0x%02x, reg_data[5]:0x%02x\n", 
-	      reg_sec_setting.reg_addr, reg_sec_setting.reg_data[4], reg_sec_setting.reg_data[5]);
-	reg_sec_setting.reg_data_size = 6;
-	
-	rc = a_ctrl->i2c_client.i2c_func_tbl->
-			i2c_write_seq_table(&a_ctrl->i2c_client,
-			&conf_sec_array);
-
-	memset(&reg_sec_setting, 0, sizeof(struct msm_camera_i2c_seq_reg_array));
-
-	reg_sec_setting.reg_addr = 0x3373;
-	
-	reg_sec_setting.reg_data[0] = 0x00;
-	reg_sec_setting.reg_data[1] = 0x06;
-	reg_sec_setting.reg_data_size = 2;
-
-	rc = a_ctrl->i2c_client.i2c_func_tbl->
-			i2c_write_seq_table(&a_ctrl->i2c_client,
-			&conf_sec_array);
-
-	memset(&reg_sec_setting, 0, sizeof(struct msm_camera_i2c_seq_reg_array));
-
-	reg_sec_setting.reg_addr = 0x3370;
-	
-	reg_sec_setting.reg_data[0] = 0x81;  // I2C_CMD_TRIG + CMD
-	reg_sec_setting.reg_data_size = 1;
-
-	rc = a_ctrl->i2c_client.i2c_func_tbl->
-			i2c_write_seq_table(&a_ctrl->i2c_client,
-			&conf_sec_array);
-
-	client_addr_type = a_ctrl->i2c_client.addr_type;
-	a_ctrl->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
-
-	do{
-		rc = a_ctrl->i2c_client.i2c_func_tbl->
-			i2c_read(&a_ctrl->i2c_client, 0x3370, &status,
-			MSM_CAMERA_I2C_BYTE_DATA);
-		CDBG("read wait status = 0x%02x\n", status);
-		
-	}while((status & 0x80) != 0);
-
-	a_ctrl->i2c_client.addr_type = client_addr_type;
-	
-/* SHLOCAL_CAMERA_DRIVERS-> */
-	mutex_unlock(&shcampdaf_mutex);
-/* SHLOCAL_CAMERA_DRIVERS<- */
-
-	CDBG("%s rc=%d\n", __func__, rc);
-
-#endif  /* CONFIG_SH_OIS */
-
 	CDBG("Exit\n");
 }
 
@@ -688,11 +590,7 @@ static int32_t msm_actuator_move_focus(
 	uint16_t curr_lens_pos = 0;
 	int dir = move_params->dir;
 	int32_t num_steps = move_params->num_steps;
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#ifndef CONFIG_SH_OIS
 	struct msm_camera_i2c_reg_setting reg_setting;
-#endif
-/* SHLOCAL_CAMERA_DRIVERS<- */
 
 	CDBG("called, dir %d, num_steps %d\n", dir, num_steps);
 
@@ -786,8 +684,6 @@ static int32_t msm_actuator_move_focus(
 	kfree(ringing_params_kernel);
 
 	move_params->curr_lens_pos = curr_lens_pos;
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#ifndef CONFIG_SH_OIS
 	reg_setting.reg_setting = a_ctrl->i2c_reg_tbl;
 	reg_setting.data_type = a_ctrl->i2c_data_type;
 	reg_setting.size = a_ctrl->i2c_tbl_index;
@@ -797,8 +693,6 @@ static int32_t msm_actuator_move_focus(
 		pr_err("i2c write error:%d\n", rc);
 		return rc;
 	}
-#endif
-/* SHLOCAL_CAMERA_DRIVERS<- */
 	a_ctrl->i2c_tbl_index = 0;
 	CDBG("Exit\n");
 
@@ -928,15 +822,9 @@ static int32_t msm_actuator_bivcm_move_focus(
 
 static int32_t msm_actuator_park_lens(struct msm_actuator_ctrl_t *a_ctrl)
 {
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#ifndef CONFIG_SH_OIS
 	int32_t rc = 0;
 	uint16_t next_lens_pos = 0;
 	struct msm_camera_i2c_reg_setting reg_setting;
-#else
-	uint16_t next_lens_pos = 0;
-#endif
-/* SHLOCAL_CAMERA_DRIVERS<- */
 
 	a_ctrl->i2c_tbl_index = 0;
 	if ((a_ctrl->curr_step_pos > a_ctrl->total_steps) ||
@@ -981,8 +869,6 @@ static int32_t msm_actuator_park_lens(struct msm_actuator_ctrl_t *a_ctrl)
 			next_lens_pos, a_ctrl->park_lens.hw_params,
 			a_ctrl->park_lens.damping_delay);
 
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#ifndef CONFIG_SH_OIS
 		reg_setting.reg_setting = a_ctrl->i2c_reg_tbl;
 		reg_setting.size = a_ctrl->i2c_tbl_index;
 		reg_setting.data_type = a_ctrl->i2c_data_type;
@@ -995,8 +881,6 @@ static int32_t msm_actuator_park_lens(struct msm_actuator_ctrl_t *a_ctrl)
 				__func__, __LINE__);
 			return rc;
 		}
-#endif
-/* SHLOCAL_CAMERA_DRIVERS<- */
 		a_ctrl->i2c_tbl_index = 0;
 		/* Use typical damping time delay to avoid tick sound */
 		usleep_range(10000, 12000);
@@ -1291,11 +1175,6 @@ static int32_t msm_actuator_power_down(struct msm_actuator_ctrl_t *a_ctrl)
 		a_ctrl->i2c_reg_tbl = NULL;
 		a_ctrl->i2c_tbl_index = 0;
 		a_ctrl->actuator_state = ACT_OPS_INACTIVE;
-
-/* SHLOCAL_CAMERA_DRIVERS-> */
-		a_ctrl->fw_inited = 0;
-/* SHLOCAL_CAMERA_DRIVERS<- */
-
 	}
 	CDBG("Exit\n");
 	return rc;
@@ -1310,11 +1189,7 @@ static int32_t msm_actuator_set_position(
 	uint16_t next_lens_position;
 	uint16_t delay;
 	uint32_t hw_params = 0;
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#ifndef CONFIG_SH_OIS
 	struct msm_camera_i2c_reg_setting reg_setting;
-#endif
-/* SHLOCAL_CAMERA_DRIVERS<- */
 
 	CDBG("%s Enter %d\n", __func__, __LINE__);
 	if (set_pos->number_of_steps <= 0 ||
@@ -1344,8 +1219,6 @@ static int32_t msm_actuator_set_position(
 		a_ctrl->func_tbl->actuator_parse_i2c_params(a_ctrl,
 			next_lens_position, hw_params, delay);
 
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#ifndef CONFIG_SH_OIS
 		reg_setting.reg_setting = a_ctrl->i2c_reg_tbl;
 		reg_setting.size = a_ctrl->i2c_tbl_index;
 		reg_setting.data_type = a_ctrl->i2c_data_type;
@@ -1358,8 +1231,6 @@ static int32_t msm_actuator_set_position(
 				__func__, __LINE__);
 			return rc;
 		}
-#endif
-/* SHLOCAL_CAMERA_DRIVERS<- */
 		a_ctrl->i2c_tbl_index = 0;
 	}
 	CDBG("%s exit %d\n", __func__, __LINE__);
@@ -1568,240 +1439,6 @@ static int msm_actuator_init(struct msm_actuator_ctrl_t *a_ctrl)
 	return rc;
 }
 
-/* SHLOCAL_CAMERA_DRIVERS-> */
-static int32_t bu63164gwl_act_i2c_write(struct msm_actuator_ctrl_t *a_ctrl,
-	void __user *argp)
-{
-	struct i2c_info_t *cdata = (struct i2c_info_t *)argp;
-	struct msm_camera_i2c_seq_reg_setting conf_sec_array;
-	struct msm_camera_i2c_seq_reg_array reg_sec_setting;
-	int32_t rc = -EFAULT, i;
-	uint16_t status = 0;
-	unsigned char temp_data[8];
-	uint16_t client_addr_type;
-	
-	CDBG("%s:%d Enter\n", __func__, __LINE__);
-
-	if( cdata->length > I2C_SEQ_REG_DATA_MAX ){
-		/* not support */
-		pr_err("%s no support length %d failed\n", __func__, cdata->length);
-		return -EFAULT;
-	}
-	
-	if(a_ctrl->fw_inited ==0){
-#ifdef CONFIG_SH_OIS
-		sh_ois_fw_wait_complete();
-#endif /* CONFIG_SH_OIS */
-		a_ctrl->fw_inited = 1;
-	}
-
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#ifdef CONFIG_SH_OIS
-	mutex_lock(&shcampdaf_mutex);
-#endif /* CONFIG_SH_OIS */
-/* SHLOCAL_CAMERA_DRIVERS<- */
-
-	memset(&reg_sec_setting, 0, sizeof(struct msm_camera_i2c_seq_reg_array));
-
-	if(copy_from_user(
-			temp_data, 
-			(void *)cdata->data,
-			cdata->length)){
-		pr_err("%s copy failed\n", __func__);
-		return -EFAULT;
-	}
-
-	conf_sec_array.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
-	conf_sec_array.delay = 0;
-	conf_sec_array.reg_setting = &reg_sec_setting;
-	conf_sec_array.size = 1;
-
-	reg_sec_setting.reg_addr = 0x3378;
-	reg_sec_setting.reg_data[0] = 0x1C >> 1;  // slave
-	reg_sec_setting.reg_data[1] = cdata->addr;
-	for(i = 0; i < cdata->length; i++){
-		reg_sec_setting.reg_data[i + 2] = temp_data[i];
-	}
-
-	reg_sec_setting.reg_data_size = cdata->length + 2;
-
-	CDBG("addr:0x%x, length:%d\n", reg_sec_setting.reg_addr, reg_sec_setting.reg_data_size);
-	CDBG("reg_sec_setting.reg_data[0]:0x%x, reg_sec_setting.reg_data[1]:0x%x\n", reg_sec_setting.reg_data[0], reg_sec_setting.reg_data[1]);
-	CDBG("reg_sec_setting.reg_data[2]:0x%x, reg_sec_setting.reg_data[3]:0x%x\n", reg_sec_setting.reg_data[2], reg_sec_setting.reg_data[3]);
-	CDBG("reg_sec_setting.reg_data[4]:0x%x, reg_sec_setting.reg_data[5]:0x%x\n", reg_sec_setting.reg_data[4], reg_sec_setting.reg_data[5]);
-	rc = a_ctrl->i2c_client.i2c_func_tbl->
-			i2c_write_seq_table(&a_ctrl->i2c_client,
-			&conf_sec_array);
-
-	memset(&reg_sec_setting, 0, sizeof(struct msm_camera_i2c_seq_reg_array));
-
-	reg_sec_setting.reg_addr = 0x3373;
-	
-	reg_sec_setting.reg_data[0] = 0x00;
-	reg_sec_setting.reg_data[1] = cdata->length + 2;
-	reg_sec_setting.reg_data_size = 2;
-
-	CDBG("reg_sec_setting addr = 0x%04x, reg_data[0]:0x%x, reg_data[1]:0x%x\n", reg_sec_setting.reg_addr, reg_sec_setting.reg_data[0], reg_sec_setting.reg_data[1]);
-	rc = a_ctrl->i2c_client.i2c_func_tbl->
-			i2c_write_seq_table(&a_ctrl->i2c_client,
-			&conf_sec_array);
-
-	memset(&reg_sec_setting, 0, sizeof(struct msm_camera_i2c_seq_reg_array));
-
-	reg_sec_setting.reg_addr = 0x3370;
-	
-	reg_sec_setting.reg_data[0] = 0x81;  // I2C_CMD_TRIG + CMD
-	reg_sec_setting.reg_data_size = 1;
-
-	rc = a_ctrl->i2c_client.i2c_func_tbl->
-			i2c_write_seq_table(&a_ctrl->i2c_client,
-			&conf_sec_array);
-
-	// wait
-	client_addr_type = a_ctrl->i2c_client.addr_type;
-	a_ctrl->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
-
-	do{
-//		msleep(1);
-	
-		rc = a_ctrl->i2c_client.i2c_func_tbl->
-			i2c_read(&a_ctrl->i2c_client, 0x3370, &status,
-			MSM_CAMERA_I2C_BYTE_DATA);
-		CDBG("read wait status = 0x%02x\n", status);
-		
-	}while((status & 0x80) != 0);
-
-	a_ctrl->i2c_client.addr_type = client_addr_type;
-	
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#ifdef CONFIG_SH_OIS
-	mutex_unlock(&shcampdaf_mutex);
-#endif /* CONFIG_SH_OIS */
-/* SHLOCAL_CAMERA_DRIVERS<- */
-
-	CDBG("%s rc=%d\n", __func__, rc);
-	if (rc < 0)
-		return -EFAULT;
-
-	CDBG("%s:%d Exit\n", __func__, __LINE__);
-	
-	
-	return rc;
-}
-
-static int32_t bu63164gwl_act_i2c_read(struct msm_actuator_ctrl_t *a_ctrl,
-	void __user *argp)
-{
-	struct i2c_info_t *cdata = (struct i2c_info_t *)argp;
-	int32_t rc = -EFAULT;
-	uint16_t data, status = 0;
-	uint8_t out[2] ={ 0, 0 };
-	uint16_t client_addr_type;
-	struct msm_camera_i2c_seq_reg_setting conf_sec_array;
-	struct msm_camera_i2c_seq_reg_array reg_sec_setting;
-
-	CDBG("%s:%d Enter\n", __func__, __LINE__);
-	
-	if( cdata->length > 2 ){
-		/* not support */
-		pr_err("%s no support length %d failed\n", __func__, cdata->length);
-		return -EFAULT;
-	}
-	
-	CDBG("%s i2c_info.addr = 0x%0x\n",   __func__, cdata->addr);
-	CDBG("%s i2c_info.length = 0x%0x\n", __func__, cdata->length);
-	
-	if(a_ctrl->fw_inited ==0){
-#ifdef CONFIG_SH_OIS
-		sh_ois_fw_wait_complete();
-#endif /* CONFIG_SH_OIS */
-		a_ctrl->fw_inited = 1;
-	}
-
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#ifdef CONFIG_SH_OIS
-	mutex_lock(&shcampdaf_mutex);
-#endif /* CONFIG_SH_OIS */
-/* SHLOCAL_CAMERA_DRIVERS<- */
-
-	memset(&reg_sec_setting, 0, sizeof(struct msm_camera_i2c_seq_reg_array));
-
-	conf_sec_array.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
-	conf_sec_array.delay = 0;
-	conf_sec_array.reg_setting = &reg_sec_setting;
-	conf_sec_array.size = 1;
-
-	reg_sec_setting.reg_addr = 0x3378;
-	reg_sec_setting.reg_data[0] = 0x1C >> 1;  // slave
-	reg_sec_setting.reg_data[1] = (cdata->addr & 0xFF00) >> 8;
-	reg_sec_setting.reg_data[2] = (cdata->addr & 0x00FF) ;
-	reg_sec_setting.reg_data_size = 3;
-
-	rc = a_ctrl->i2c_client.i2c_func_tbl->
-			i2c_write_seq_table(&a_ctrl->i2c_client,
-			&conf_sec_array);
-
-	memset(&reg_sec_setting, 0, sizeof(struct msm_camera_i2c_seq_reg_array));
-	reg_sec_setting.reg_addr = 0x3373;
-	reg_sec_setting.reg_data[0] = 0x02;
-	reg_sec_setting.reg_data[1] = 0x03;
-	reg_sec_setting.reg_data_size = 2;
-
-	rc = a_ctrl->i2c_client.i2c_func_tbl->
-			i2c_write_seq_table(&a_ctrl->i2c_client,
-			&conf_sec_array);
-
-	memset(&reg_sec_setting, 0, sizeof(struct msm_camera_i2c_seq_reg_array));
-	reg_sec_setting.reg_addr = 0x3370;
-	reg_sec_setting.reg_data[0] = 0x82;  // I2C_CMD_TRIG + CMD
-	reg_sec_setting.reg_data_size = 1;
-
-	rc = a_ctrl->i2c_client.i2c_func_tbl->
-			i2c_write_seq_table(&a_ctrl->i2c_client,
-			&conf_sec_array);
-	
-	// wait
-	client_addr_type = a_ctrl->i2c_client.addr_type;
-	a_ctrl->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
-	
-	do{
-//		msleep(1);
-		rc = a_ctrl->i2c_client.i2c_func_tbl->
-			i2c_read(&a_ctrl->i2c_client, 0x3370, &status,
-			MSM_CAMERA_I2C_BYTE_DATA);
-		CDBG("read wait status = 0x%02x\n", status);
-		
-	}while((status & 0x80) != 0);
-	
-	a_ctrl->i2c_client.addr_type = MSM_CAMERA_I2C_WORD_ADDR;
-	
-	rc = a_ctrl->i2c_client.i2c_func_tbl->
-		i2c_read(&a_ctrl->i2c_client, 0x337B, &data,
-		MSM_CAMERA_I2C_WORD_DATA);
-
-	CDBG("%s data=0x%04x\n", __func__, data);
-
-	a_ctrl->i2c_client.addr_type = client_addr_type;
-	out[0] = (data & 0xff00) >> 8;
-	out[1] = data & 0x00ff;
-
-	if (copy_to_user((void __user *)cdata->data,
-		(void *)out,
-		cdata->length)){
-		pr_err("%s copy_to_user error\n",__func__);
-		return -EFAULT;
-	}
-	
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#ifdef CONFIG_SH_OIS
-	mutex_unlock(&shcampdaf_mutex);
-#endif /* CONFIG_SH_OIS */
-/* SHLOCAL_CAMERA_DRIVERS<- */
-	CDBG("%s:%d Exit\n", __func__, __LINE__);
-	return rc;
-}
-/* SHLOCAL_CAMERA_DRIVERS<- */
-
 static int32_t msm_actuator_config(struct msm_actuator_ctrl_t *a_ctrl,
 	void *argp)
 {
@@ -1876,21 +1513,6 @@ static int32_t msm_actuator_config(struct msm_actuator_ctrl_t *a_ctrl,
 		if (rc < 0)
 			pr_err("Failed actuator power up%d\n", rc);
 		break;
-/* SHLOCAL_CAMERA_DRIVERS-> */
-	case SHCFG_SET_I2C_DATA:
-	CDBG("%s:%d SHCFG_SET_I2C_DATA\n", __func__, __LINE__);
-		rc = bu63164gwl_act_i2c_write(a_ctrl, &cdata->cfg.i2c_info);
-		if (rc < 0)
-			pr_err("Failed actuator I2C write %d\n", rc);
-		break;
-
-	case SHCFG_GET_I2C_DATA:
-	CDBG("%s:%d SHCFG_GET_I2C_DATA\n", __func__, __LINE__);
-		rc = bu63164gwl_act_i2c_read(a_ctrl, &cdata->cfg.i2c_info);
-		if (rc < 0)
-			pr_err("get i2c failed %d\n", rc);
-		break;
-/* SHLOCAL_CAMERA_DRIVERS<- */
 
 	default:
 		break;
@@ -1972,11 +1594,6 @@ static int msm_actuator_close(struct v4l2_subdev *sd,
 	}
 	a_ctrl->actuator_state = ACT_DISABLE_STATE;
 	mutex_unlock(a_ctrl->actuator_mutex);
-
-/* SHLOCAL_CAMERA_DRIVERS-> */
-	a_ctrl->fw_inited = 0;
-/* SHLOCAL_CAMERA_DRIVERS<- */
-
 	CDBG("Exit\n");
 	return rc;
 }
@@ -2135,19 +1752,6 @@ static long msm_actuator_subdev_do_ioctl(
 			memcpy(&actuator_data.cfg.setpos, &(u32->cfg.setpos),
 				sizeof(struct msm_actuator_set_position_t));
 			break;
-/* SHLOCAL_CAMERA_DRIVERS-> */
-		case SHCFG_SET_I2C_DATA:
-		case SHCFG_GET_I2C_DATA:
-		CDBG("%s:%d: SHCFG_SET_I2C_DATA or SHCFG_GET_I2C_DATA\n", __func__, __LINE__);
-			actuator_data.cfgtype = u32->cfgtype;
-			actuator_data.is_af_supported = u32->is_af_supported;
-			actuator_data.cfg.i2c_info.addr = u32->cfg.i2c_info.addr;
-			actuator_data.cfg.i2c_info.length = u32->cfg.i2c_info.length;
-			actuator_data.cfg.i2c_info.data = compat_ptr(u32->cfg.i2c_info.data);
-			
-			parg = &actuator_data;
-		break;
-/* SHLOCAL_CAMERA_DRIVERS<- */
 		default:
 			actuator_data.cfgtype = u32->cfgtype;
 			parg = &actuator_data;
@@ -2327,11 +1931,6 @@ static int32_t msm_actuator_i2c_probe(struct i2c_client *client,
 	act_ctrl_t->msm_sd.sd.devnode->fops =
 		&msm_actuator_v4l2_subdev_fops;
 	act_ctrl_t->actuator_state = ACT_DISABLE_STATE;
-
-/* SHLOCAL_CAMERA_DRIVERS-> */
-	act_ctrl_t->fw_inited = 0;
-/* SHLOCAL_CAMERA_DRIVERS<- */
-
 	pr_info("msm_actuator_i2c_probe: succeeded\n");
 	CDBG("Exit\n");
 
@@ -2444,10 +2043,6 @@ static int32_t msm_actuator_platform_probe(struct platform_device *pdev)
 #endif
 	msm_actuator_t->msm_sd.sd.devnode->fops =
 		&msm_actuator_v4l2_subdev_fops;
-
-/* SHLOCAL_CAMERA_DRIVERS-> */
-	msm_actuator_t->fw_inited = 0;
-/* SHLOCAL_CAMERA_DRIVERS<- */
 
 	CDBG("Exit\n");
 	return rc;

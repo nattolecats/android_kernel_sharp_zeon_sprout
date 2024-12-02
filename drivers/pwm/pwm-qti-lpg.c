@@ -884,60 +884,6 @@ static int qpnp_lpg_pwm_config(struct pwm_chip *pwm_chip,
 	return qpnp_lpg_config(lpg, (u64)duty_ns, (u64)period_ns);
 }
 
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00037 */
-static int qpnp_lpg_pwm_config_u64(struct pwm_chip *pwm_chip,
-		struct pwm_device *pwm, long duty_ns_u64, long period_ns_u64)
-{
-	struct qpnp_lpg_channel *lpg;
-	int rc = 0;
-
-	lpg = pwm_dev_to_qpnp_lpg(pwm_chip, pwm);
-	if (lpg == NULL) {
-		dev_err(pwm_chip->dev, "lpg not found\n");
-		return -ENODEV;
-	}
-
-	if (duty_ns_u64 > period_ns_u64) {
-		dev_err(pwm_chip->dev, "Duty %ldns is larger than period %ldns\n",
-						duty_ns_u64, period_ns_u64);
-		return -EINVAL;
-	}
-
-	if (period_ns_u64 != lpg->current_period_ns) {
-		__qpnp_lpg_calc_pwm_period(period_ns_u64, &lpg->pwm_config);
-
-		/* program LUT if PWM period is changed */
-		if (lpg->src_sel == LUT_PATTERN) {
-			rc = qpnp_lpg_set_lut_pattern(lpg,
-					lpg->ramp_config.pattern,
-					lpg->ramp_config.pattern_length);
-			if (rc < 0) {
-				dev_err(pwm_chip->dev, "set LUT pattern failed for LPG%d, rc=%d\n",
-						lpg->lpg_idx, rc);
-				return rc;
-			}
-			lpg->lut_written = true;
-		}
-	}
-
-	if (period_ns_u64 != lpg->current_period_ns ||
-			duty_ns_u64 != lpg->current_duty_ns)
-		__qpnp_lpg_calc_pwm_duty(period_ns_u64, duty_ns_u64, &lpg->pwm_config);
-
-	rc = qpnp_lpg_set_pwm_config(lpg);
-	if (rc < 0) {
-		dev_err(pwm_chip->dev, "Config PWM failed for channel %d, rc=%d\n",
-						lpg->lpg_idx, rc);
-		return rc;
-	}
-
-	lpg->current_period_ns = period_ns_u64;
-	lpg->current_duty_ns = duty_ns_u64;
-
-	return rc;
-}
-#endif /* CONFIG_LEDS_SHARP */
-
 static int qpnp_lpg_pwm_config_extend(struct pwm_chip *pwm_chip,
 		struct pwm_device *pwm, u64 duty_ns, u64 period_ns)
 {
@@ -1342,9 +1288,6 @@ static void qpnp_lpg_pwm_dbg_show(struct pwm_chip *pwm_chip, struct seq_file *s)
 
 static const struct pwm_ops qpnp_lpg_pwm_ops = {
 	.config = qpnp_lpg_pwm_config,
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00037 */
-	.config_u64 = qpnp_lpg_pwm_config_u64,
-#endif /* CONFIG_LEDS_SHARP */
 	.config_extend = qpnp_lpg_pwm_config_extend,
 	.get_output_type_supported = qpnp_lpg_pwm_output_types_supported,
 	.set_output_type = qpnp_lpg_pwm_set_output_type,

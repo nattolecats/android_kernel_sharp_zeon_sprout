@@ -2331,11 +2331,7 @@ int msm_isp_drop_frame(struct vfe_device *vfe_dev,
 	struct msm_isp_bufq *bufq = NULL;
 	uint32_t pingpong_bit;
 	int vfe_idx;
-/* SHLOCAL_CAMERA_IMAGE_QUALITY-> *//* for HDR */
-#if 0
 	int rc = -1;
-#endif
-/* SHLOCAL_CAMERA_IMAGE_QUALITY<- */
 
 	if (!vfe_dev || !stream_info || !ts || !sof_info) {
 		pr_err("%s %d vfe_dev %pK stream_info %pK ts %pK op_info %pK\n",
@@ -2352,8 +2348,6 @@ int msm_isp_drop_frame(struct vfe_device *vfe_dev,
 	pingpong_bit =
 		(~(pingpong_status >> stream_info->wm[vfe_idx][0]) & 0x1);
 	done_buf = stream_info->buf[pingpong_bit];
-/* SHLOCAL_CAMERA_IMAGE_QUALITY-> *//* for HDR */
-#if 0
 	if (done_buf &&
 		(stream_info->composite_irq[MSM_ISP_COMP_IRQ_EPOCH] == 0)) {
 		if ((stream_info->sw_ping_pong_bit != -1) &&
@@ -2391,21 +2385,6 @@ int msm_isp_drop_frame(struct vfe_device *vfe_dev,
 			msm_isp_cfg_framedrop_reg(stream_info);
 		}
 	}
-#else
-	if (done_buf) {
-		bufq = vfe_dev->buf_mgr->ops->get_bufq(vfe_dev->buf_mgr,
-			done_buf->bufq_handle);
-		if (!bufq) {
-			spin_unlock_irqrestore(&stream_info->lock, flags);
-			pr_err("%s: Invalid bufq buf_handle %x\n",
-				__func__, done_buf->bufq_handle);
-			return -EINVAL;
-		}
-		sof_info->reg_update_fail_mask_ext |=
-			(bufq->bufq_handle & 0xFF);
-	}
-#endif
-/* SHLOCAL_CAMERA_IMAGE_QUALITY<- */
 	spin_unlock_irqrestore(&stream_info->lock, flags);
 
 	/* if buf done will not come, we need to process it ourself */
@@ -2414,12 +2393,8 @@ int msm_isp_drop_frame(struct vfe_device *vfe_dev,
 		/* no buf done come */
 		msm_isp_process_axi_irq_stream(vfe_dev, stream_info,
 			pingpong_status, ts);
-/* SHLOCAL_CAMERA_IMAGE_QUALITY-> *//* for HDR */
-#if 0
 		if (done_buf)
 			done_buf->is_drop_reconfig = 0;
-#endif
-/* SHLOCAL_CAMERA_IMAGE_QUALITY<- */
 	}
 	return 0;
 }

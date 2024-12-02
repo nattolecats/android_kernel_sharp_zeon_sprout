@@ -75,22 +75,6 @@
 #define MSMFB_LPM_ENABLE	_IOWR(MSMFB_IOCTL_MAGIC, 170, unsigned int)
 #define MSMFB_MDP_PP_GET_FEATURE_VERSION _IOWR(MSMFB_IOCTL_MAGIC, 171, \
 					      struct mdp_pp_feature_version)
-#define MSMFB_PANEL_SET_GMMTABLE_AND_VOLTAGE _IOW(MSMFB_IOCTL_MAGIC, 180, \
-					      struct mdp_gmm_volt_info)
-#define MSMFB_PANEL_GET_GMMTABLE_AND_VOLTAGE _IOR(MSMFB_IOCTL_MAGIC, 181, \
-					      struct mdp_gmm_volt_info)
-#define MSMFB_SET_FLICKER_PARAM _IOW(MSMFB_IOCTL_MAGIC, 182, \
-					      struct mdp_flicker_param)
-#define MSMFB_GET_FLICKER_PARAM _IOR(MSMFB_IOCTL_MAGIC, 183, \
-					      struct mdp_flicker_param)
-#define MSMFB_MIPI_DSI_CHECK _IOWR(MSMFB_IOCTL_MAGIC, 184, \
-						struct mdp_mipi_check_param)
-#define MSMFB_MIPI_DSI_CLKCHG _IOW(MSMFB_IOCTL_MAGIC, 185, \
-						struct mdp_mipi_clkchg_param)
-#define MSMFB_GET_PANEL_OTP_INFO _IOR(MSMFB_IOCTL_MAGIC, 186, \
-						struct mdp_panel_otp_info)
-#define MSMFB_CHANGE_BASE_FPS_LOW  _IOW(MSMFB_IOCTL_MAGIC, 187, unsigned int)
-#define MSMFB_SET_DFPS_PAUSE _IOW(MSMFB_IOCTL_MAGIC, 188, unsigned int)
 
 #define FB_TYPE_3D_PANEL 0x10101010
 #define MDP_IMGTYPE2_START 0x10000
@@ -317,11 +301,6 @@ enum mdss_mdp_max_bw_mode {
 #define MDP_DEEP_COLOR_RGB30B    0x2
 #define MDP_DEEP_COLOR_RGB36B    0x4
 #define MDP_DEEP_COLOR_RGB48B    0x8
-
-#define MDSS_BASE_FPS_30		(30)
-#define MDSS_BASE_FPS_60		(60)
-#define MDSS_BASE_FPS_120		(120)
-#define MDSS_BASE_FPS_DEFAULT	MDSS_BASE_FPS_60
 
 struct mdp_rect {
 	uint32_t x;
@@ -1413,48 +1392,6 @@ struct msmfb_mixer_info_req {
 	struct mdp_mixer_info info[MAX_PIPE_PER_MIXER];
 };
 
-struct mdp_mipi_check_param {
-	uint8_t frame_cnt;
-	uint8_t amp;
-	uint8_t sensitiv;
-	uint8_t result_master;
-	uint8_t result_slave;
-};
-
-struct mdp_mipi_clkchg_host {
-	unsigned int clock_rate;
-	unsigned short display_width;
-	unsigned short display_height;
-	unsigned short hsync_pulse_width;
-	unsigned short h_back_porch;
-	unsigned short h_front_porch;
-	unsigned short vsync_pulse_width;
-	unsigned short v_back_porch;
-	unsigned short v_front_porch;
-	unsigned char t_clk_post;
-	unsigned char t_clk_pre;
-	unsigned char timing_ctrl[12];
-};
-
-typedef struct mdp_mipi_clkchg_panel_tag {
-/* Please insert panel driver parameters here, if need. */
-	unsigned char DSI[5];
-	unsigned char OSC[10];
-} mdp_mipi_clkchg_panel_t;
-
-enum {
-    MDP_INTERNAL_OSC_TYPE_A,
-    MDP_INTERNAL_OSC_TYPE_B,
-    MDP_INTERNAL_OSC_TYPE_C,
-    NUM_MDP_INTERNAL_OSC_TYPE
-};
-
-struct mdp_mipi_clkchg_param {
-	struct mdp_mipi_clkchg_host host;
-	mdp_mipi_clkchg_panel_t panel;
-	int internal_osc;
-};
-
 enum {
 	DISPLAY_SUBSYSTEM_ID,
 	ROTATOR_SUBSYSTEM_ID,
@@ -1530,92 +1467,5 @@ enum {
 struct mdp_pp_feature_version {
 	uint32_t pp_feature;
 	uint32_t version_info;
-};
-
-#define MSMFB_GMMVOLT_REQ_ADJUST   (1)
-#define MSMFB_GMMVOLT_REQ_UNADJUST (2)
-
-enum panel_type {
-	PANEL_TYPE_HAYABUSA,
-	PANEL_TYPE_ROSETTA,
-	PANEL_TYPE_SINANJU,
-};
-
-#define MDSS_HAYABUSA_GMM_SIZE (60)
-#define MDSS_HAYABUSA_ADV_GMM_SIZE (30)
-
-struct hayabusa_gmm_volt {
-	unsigned short gmmR[MDSS_HAYABUSA_GMM_SIZE];
-	unsigned short gmmG[MDSS_HAYABUSA_GMM_SIZE];
-	unsigned short gmmB[MDSS_HAYABUSA_GMM_SIZE];
-	unsigned char vgh;
-	unsigned char vgl;
-	unsigned char gvddp;
-	unsigned char gvddn;
-	unsigned char gvddp2;
-	unsigned char vgho;
-	unsigned char vglo;
-	unsigned char adv_gmm[MDSS_HAYABUSA_ADV_GMM_SIZE];
-};
-
-#define MDSS_ROSETTA_GMM_SIZE (62)
-#define MDSS_ROSETTA_ADV_GMM_SIZE (30)
-
-struct rosetta_gmm_volt {
-	unsigned short gmmR[MDSS_ROSETTA_GMM_SIZE];
-	unsigned short gmmG[MDSS_ROSETTA_GMM_SIZE];
-	unsigned short gmmB[MDSS_ROSETTA_GMM_SIZE];
-	unsigned char vgh;
-	unsigned char vgl;
-	unsigned char gvddp;
-	unsigned char gvddn;
-	unsigned char gvddp2;
-	unsigned char vgho;
-	unsigned char vglo;
-	unsigned char adv_gmm[MDSS_ROSETTA_ADV_GMM_SIZE];
-};
-
-#define MDSS_SINANJU_GMM_SIZE (38)
-
-struct sinanju_gmm_volt {
-	unsigned short gmm[MDSS_SINANJU_GMM_SIZE];
-	unsigned char vgh;
-	unsigned char vgl;
-	unsigned char vpl;
-	unsigned char vnl;
-};
-
-union mdp_gmm_volt {
-	struct rosetta_gmm_volt  rosetta;
-	struct hayabusa_gmm_volt hayabusa;
-	struct sinanju_gmm_volt  sinanju;
-};
-
-struct mdp_gmm_volt_info {
-	int request;
-	enum panel_type panel_type;
-	union mdp_gmm_volt gmm_volt;
-};
-
-#define MSMFB_REG_WRITE			(0x0001)
-#define MSMFB_SAVE_VALUE		(0x0002)
-#define MSMFB_SAVE_VALUE_LOW		(0x0004)
-#define MSMFB_RESET_VALUE		(0x0008)
-#define MSMFB_GET_VALUE			(0x0100)
-#define MSMFB_GET_VALUE_LOW		(0x0200)
-
-struct mdp_flicker_param {
-	unsigned short	request;
-	unsigned short	vcom;
-};
-
-#define MDSS_MIPICHK_MANUAL 0
-#define MDSS_MIPICHK_RESULT_OK 1
-#define MDSS_MIPICHK_RESULT_NG 0
-
-struct mdp_panel_otp_info {
-    unsigned char status;
-    signed char a;
-    signed char b;
 };
 #endif /*_UAPI_MSM_MDP_H_*/

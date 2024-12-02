@@ -22,17 +22,6 @@
 
 #include "power.h"
 
-#ifdef CONFIG_SHARP_PNP_SLEEP_DEBUG
-#include <linux/module.h>
-enum {
-   SH_DEBUG_WAKEUP_SOURCE = 1U << 0,
-};
-static int sh_debug_mask = 0;
-module_param_named(
-   sh_debug_mask, sh_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP
-);
-#endif /* CONFIG_SHARP_PNP_SLEEP_DEBUG */
-
 /*
  * If set, the suspend/hibernate code will abort transitions to a sleep state
  * if wakeup events are registered during or immediately before the transition.
@@ -547,11 +536,6 @@ static void wakeup_source_activate(struct wakeup_source *ws)
 			"unregistered wakeup source\n"))
 		return;
 
-#ifdef CONFIG_SHARP_PNP_SLEEP_DEBUG
-	if (sh_debug_mask & SH_DEBUG_WAKEUP_SOURCE)
-		pr_info("wake_lock: %s, type 0\n", ws->name);
-#endif /* CONFIG_SHARP_PNP_SLEEP_DEBUG */
-
 	/*
 	 * active wakeup source should bring the system
 	 * out of PM_SUSPEND_FREEZE state
@@ -671,11 +655,6 @@ static void wakeup_source_deactivate(struct wakeup_source *ws)
 		ws->relax_count--;
 		return;
 	}
-
-#ifdef CONFIG_SHARP_PNP_SLEEP_DEBUG
-	if (sh_debug_mask & SH_DEBUG_WAKEUP_SOURCE)
-		pr_info("wake_unlock: %s\n", ws->name);
-#endif /* CONFIG_SHARP_PNP_SLEEP_DEBUG */
 
 	ws->active = false;
 
@@ -1143,26 +1122,3 @@ static int __init wakeup_sources_debugfs_init(void)
 }
 
 postcore_initcall(wakeup_sources_debugfs_init);
-
-#ifdef CONFIG_SHARP_PNP_SLEEP_DEBUG
-void print_active_locks(void)
-{
-	struct wakeup_source *ws;
-	if (sh_debug_mask & SH_DEBUG_WAKEUP_SOURCE) {
-		rcu_read_lock();
-		list_for_each_entry_rcu(ws, &wakeup_sources, entry) {
-			if (ws->active)
-			pr_info("active wake lock %s\n", ws->name);
-		}
-		rcu_read_unlock();
-	}
-}
-#endif /* CONFIG_SHARP_PNP_SLEEP_DEBUG */
-
-#ifdef CONFIG_SHARP_PNP_SLEEP_SLEEPLOG
-#include <soc/qcom/sharp/sh_sleeplog.h>
-char *sh_write_buffer_wakeup_sources(char *buffer)
-{
-	return sh_write_buffer_wakeup_sources_internal(buffer, &wakeup_sources);
-}
-#endif /* CONFIG_SHARP_PNP_SLEEP_SLEEPLOG */

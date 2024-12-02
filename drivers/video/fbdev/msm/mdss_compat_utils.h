@@ -310,20 +310,11 @@ struct mdp_qseed_cfg_data32 {
 };
 
 struct mdp_dither_cfg_data32 {
-#ifdef CONFIG_SHDISP /* CUST_ID_00020 */
-	uint32_t version;
-#endif /* CONFIG_SHDISP */
 	uint32_t block;
 	uint32_t flags;
-#ifdef CONFIG_SHDISP /* CUST_ID_00020 */
-	uint32_t mode;
-#endif /* CONFIG_SHDISP */
 	uint32_t g_y_depth;
 	uint32_t r_cr_depth;
 	uint32_t b_cb_depth;
-#ifdef CONFIG_SHDISP /* CUST_ID_00020 */
-	compat_caddr_t cfg_payload;
-#endif /* CONFIG_SHDISP */
 };
 
 struct mdp_gamut_data_v1_7_32 {
@@ -384,9 +375,6 @@ struct mdss_ad_init32 {
 	uint8_t logo_h;
 	uint32_t alpha;
 	uint32_t alpha_base;
-#ifdef CONFIG_SHDISP /* CUST_ID_00020 */
-	uint32_t al_thresh;
-#endif /* CONFIG_SHDISP */
 	uint32_t bl_lin_len;
 	uint32_t bl_att_len;
 	compat_caddr_t bl_lin;
@@ -408,13 +396,6 @@ struct mdss_ad_cfg32 {
 	uint16_t stab_itr;
 	uint32_t bl_ctrl_mode;
 };
-
-#ifdef CONFIG_SHDISP /* CUST_ID_00020 */
-struct mdss_ad_bl_cfg32 {
-	uint32_t bl_min_delta;
-	uint32_t bl_low_limit;
-};
-#endif /* CONFIG_SHDISP */
 
 /* ops uses standard MDP_PP_* flags */
 struct mdss_ad_init_cfg32 {
@@ -488,9 +469,6 @@ struct msmfb_mdp_pp32 {
 		struct mdss_ad_input32 ad_input;
 		struct mdp_calib_config_buffer32 calib_buffer;
 		struct mdp_calib_dcm_state32 calib_dcm;
-#ifdef CONFIG_SHDISP /* CUST_ID_00020 */
-		struct mdss_ad_bl_cfg32 ad_bl_cfg;
-#endif /* CONFIG_SHDISP */
 	} data;
 };
 

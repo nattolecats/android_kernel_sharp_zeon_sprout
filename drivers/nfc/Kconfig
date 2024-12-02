@@ -69,8 +69,6 @@ source "drivers/nfc/st-nci/Kconfig"
 source "drivers/nfc/nxp-nci/Kconfig"
 source "drivers/nfc/s3fwrn5/Kconfig"
 source "drivers/nfc/st95hf/Kconfig"
-source "drivers/nfc/cxd224x/Kconfig"
-source "drivers/nfc/cxd225x/Kconfig"
 endmenu
 
 config NFC_NQ

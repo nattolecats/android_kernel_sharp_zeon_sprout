@@ -108,9 +108,6 @@ struct msm_actuator_ctrl_t {
 	struct msm_camera_gpio_conf *gconf;
 	struct msm_pinctrl_info pinctrl_info;
 	uint8_t cam_pinctrl_status;
-/* SHLOCAL_CAMERA_DRIVERS-> */
-	uint8_t fw_inited;
-/* SHLOCAL_CAMERA_DRIVERS<- */
 };
 
 #endif

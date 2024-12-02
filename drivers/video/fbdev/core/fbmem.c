@@ -32,6 +32,7 @@
 #include <linux/device.h>
 #include <linux/efi.h>
 #include <linux/fb.h>
+#include <linux/overflow.h>
 
 #include <asm/fb.h>
 
@@ -981,6 +982,7 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 	if ((var->activate & FB_ACTIVATE_FORCE) ||
 	    memcmp(&info->var, var, sizeof(struct fb_var_screeninfo))) {
 		u32 activate = var->activate;
+		u32 unused;
 
 		/* When using FOURCC mode, make sure the red, green, blue and
 		 * transp fields are set to 0.
@@ -1000,6 +1002,15 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 			*var = info->var;
 			goto done;
 		}
+
+		/* bitfill_aligned() assumes that it's at least 8x8 */
+		if (var->xres < 8 || var->yres < 8)
+			return -EINVAL;
+
+		/* Too huge resolution causes multiplication overflow. */
+		if (check_mul_overflow(var->xres, var->yres, &unused) ||
+		    check_mul_overflow(var->xres_virtual, var->yres_virtual, &unused))
+			return -EINVAL;
 
 		ret = info->fbops->fb_check_var(var, info);
 
@@ -1475,9 +1486,6 @@ __releases(&info->lock)
 		goto out;
 	}
 	file->private_data = info;
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00025 */
-	info->file = file;
-#endif /* CONFIG_SHARP_DISPLAY */
 	if (info->fbops->fb_open) {
 		res = info->fbops->fb_open(info,1);
 		if (res)
@@ -1502,9 +1510,6 @@ __releases(&info->lock)
 	struct fb_info * const info = file->private_data;
 
 	mutex_lock(&info->lock);
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00025 */
-	info->file = file;
-#endif /* CONFIG_SHARP_DISPLAY */
 	if (info->fbops->fb_release)
 		info->fbops->fb_release(info,1);
 	module_put(info->fbops->owner);

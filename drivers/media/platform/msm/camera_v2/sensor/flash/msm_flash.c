@@ -20,11 +20,6 @@
 #include "msm_camera_io_util.h"
 #include "msm_camera_dt_util.h"
 #include "msm_cci.h"
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#ifdef CONFIG_SHARP_SHTERM
-#include <misc/shterm_k.h>
-#endif /* CONFIG_SHARP_SHTERM */
-/* SHLOCAL_CAMERA_DRIVERS<- */
 
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
@@ -429,11 +424,6 @@ static int32_t msm_flash_off(struct msm_flash_ctrl_t *flash_ctrl,
 			led_trigger_event(flash_ctrl->torch_trigger[i], 0);
 	if (flash_ctrl->switch_trigger)
 		led_trigger_event(flash_ctrl->switch_trigger, 0);
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#ifdef CONFIG_SHARP_SHTERM
-		shterm_k_set_info( SHTERM_INFO_MOBILE_LIGHT,  0 );
-#endif /* CONFIG_SHARP_SHTERM */
-/* SHLOCAL_CAMERA_DRIVERS<- */
 
 	CDBG("Exit\n");
 	return 0;
@@ -679,11 +669,6 @@ static int32_t msm_flash_low(
 	}
 	if (flash_ctrl->switch_trigger)
 		led_trigger_event(flash_ctrl->switch_trigger, 1);
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#ifdef CONFIG_SHARP_SHTERM
-		shterm_k_set_info( SHTERM_INFO_MOBILE_LIGHT,  1 );
-#endif /* CONFIG_SHARP_SHTERM */
-/* SHLOCAL_CAMERA_DRIVERS<- */
 	CDBG("Exit\n");
 	return 0;
 }
@@ -721,11 +706,6 @@ static int32_t msm_flash_high(
 	}
 	if (flash_ctrl->switch_trigger)
 		led_trigger_event(flash_ctrl->switch_trigger, 1);
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#ifdef CONFIG_SHARP_SHTERM
-		shterm_k_set_info( SHTERM_INFO_MOBILE_LIGHT,  1 );
-#endif /* CONFIG_SHARP_SHTERM */
-/* SHLOCAL_CAMERA_DRIVERS<- */
 	return 0;
 }
 

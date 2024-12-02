@@ -30,32 +30,12 @@
 #endif
 #include "mdss_debug.h"
 
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00011 */
-#include "mdss_diag.h"
-#endif /* CONFIG_SHDISP */
-#ifdef TARGET_HW_MDSS_HDMI
-#include "mdss_dba_utils.h"
-#endif
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00019 */
-#include "mdss_dsi_phy.h"
-#endif /* CONFIG_SHARP_DISPLAY */
 #define DT_CMD_HDR 6
 #define DEFAULT_MDP_TRANSFER_TIME 14000
 
 #define VSYNC_DELAY msecs_to_jiffies(17)
 
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00019 */
-/* No. of timing params for phy rev 2.0 */
-#define TIMING_PARAM_DLANE_COUNT	32
-#define TIMING_PARAM_CLK_COUNT		8
-#endif /* CONFIG_SHARP_DISPLAY */
-
 DEFINE_LED_TRIGGER(bl_led_trigger);
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00009 */
-static int mdss_dsi_panel_parse_brightness(struct device_node *np,
-	struct mdss_dsi_ctrl_pdata *ctrl);
-#endif /* CONFIG_SHARP_DISPLAY */
 
 void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl)
 {
@@ -92,18 +72,6 @@ end:
 static void mdss_dsi_panel_bklt_pwm(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 {
 	int ret;
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00009 */
-	int in = level;
-	int out = level;
-	int x;
-	int x1;
-	int y;
-	int y1;
-	int cnt;
-	int i = 0;
-	struct mdss_panel_info *pinfo = &ctrl->panel_data.panel_info;
-	struct mdss_panel_linear_params *linear_params;
-#endif /* CONFIG_SHARP_DISPLAY */
 	u32 duty;
 	u32 period_ns;
 
@@ -124,34 +92,7 @@ static void mdss_dsi_panel_bklt_pwm(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 		ctrl->pwm_enabled = 0;
 		return;
 	}
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00009 */
-	cnt = pinfo->linear_params.cnt;
-	linear_params = &pinfo->linear_params;
 
-	if (cnt < 2) {
-		pr_err("%s:cnt < 2\n", __func__);
-	} else
-	if (in <= linear_params->param[0].x) {
-		out = linear_params->param[0].y;
-	} else
-	if (in >= linear_params->param[cnt-1].x) {
-		out = linear_params->param[cnt-1].y;
-	} else {
-		for (i = 1;i < cnt;i++) {
-			if (in <= linear_params->param[i].x) {
-				x  = linear_params->param[i].x;
-				x1 = linear_params->param[i-1].x;
-				y  = linear_params->param[i].y;
-				y1 = linear_params->param[i-1].y;
-				out = ((y - y1) * in + y1 * x - y * x1) /
-					(x - x1);
-				break;
-			}
-		}
-	}
-	level = out;
-	pr_debug("%s:bkl level in=%d out=%d\n",__func__, in, out);
-#endif /* CONFIG_SHARP_DISPLAY */
 	duty = level * ctrl->pwm_period;
 	duty /= ctrl->bklt_max;
 
@@ -377,16 +318,6 @@ static int mdss_dsi_request_gpios(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 			rc);
 		goto rst_gpio_err;
 	}
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00004 */
-	if (ctrl_pdata->tp_rst_gpio) {
-		rc = gpio_request(ctrl_pdata->tp_rst_gpio, "tp_rst_n");
-		if (rc) {
-			pr_err("request tp reset gpio failed, rc=%d\n",
-				rc);
-			goto rst_gpio_err;
-		}
-	}
-#endif /* CONFIG_SHARP_DISPLAY */
 	if (gpio_is_valid(ctrl_pdata->bklt_en_gpio)) {
 		rc = gpio_request(ctrl_pdata->bklt_en_gpio,
 						"bklt_enable");
@@ -429,37 +360,6 @@ rst_gpio_err:
 disp_en_gpio_err:
 	return rc;
 }
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00004 */
-int mdss_dsi_enable_panel_vddio_gpio(struct mdss_dsi_ctrl_pdata *ctrl_pdata,
-		int enable)
-{
-	int rc = 0;
-	if (!gpio_is_valid(ctrl_pdata->panel_vddio_gpio)) {
-		goto end;
-	}
-
-	if (enable) {
-		if (ctrl_pdata->panel_vddio_gpio) {
-			rc = gpio_request(ctrl_pdata->panel_vddio_gpio,
-							"panel_vddio_gpio");
-			if (!rc) {
-				// LDO EN ON
-				gpio_set_value(ctrl_pdata->panel_vddio_gpio, 1);
-			}
-		}
-		usleep_range(3 * 1000, 3 * 1000);
-	} else {
-		// LDO EN OFF
-		gpio_set_value(ctrl_pdata->panel_vddio_gpio, 0);
-		gpio_free(ctrl_pdata->panel_vddio_gpio);
-		usleep_range(60 * 1000, 60 * 1000);
-	}
-end:
-	return rc;
-}
-
-#endif /* CONFIG_SHARP_DISPLAY */
 
 int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 {
@@ -530,16 +430,6 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 		return 0;
 	}
 
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00004 */
-	if (ctrl_pdata->tp_rst_gpio) {
-		if (!gpio_is_valid(ctrl_pdata->tp_rst_gpio)) {
-			pr_err("%s:%d, tp reset line not configured\n",
-				   __func__, __LINE__);
-			return rc;
-		}
-	}
-#endif /* CONFIG_SHARP_DISPLAY */
-
 	pr_debug("%s: enable = %d\n", __func__, enable);
 
 	if (enable) {
@@ -560,19 +450,6 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 				gpio_set_value((ctrl_pdata->disp_en_gpio), 1);
 				usleep_range(100, 110);
 			}
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00004 */
-			if (ctrl_pdata->tp_rst_gpio) {
-				rc = gpio_direction_output(
-					ctrl_pdata->tp_rst_gpio, 1);
-				if (rc) {
-					pr_err("%s: unable to set dir for "
-						"tp rst gpio\n", __func__);
-					goto exit;
-				}
-				usleep_range(20 * 1000, 20 * 1000);
-			}
-#endif /* CONFIG_SHARP_DISPLAY */
 
 			if (pdata->panel_info.rst_seq_len) {
 				rc = gpio_direction_output(ctrl_pdata->rst_gpio,
@@ -647,13 +524,6 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 		}
 		gpio_set_value((ctrl_pdata->rst_gpio), 0);
 		gpio_free(ctrl_pdata->rst_gpio);
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00004 */
-		if (ctrl_pdata->tp_rst_gpio) {
-			usleep_range(10 * 1000, 10 * 1000);
-			gpio_set_value((ctrl_pdata->tp_rst_gpio), 0);
-			gpio_free(ctrl_pdata->tp_rst_gpio);
-		}
-#endif /* CONFIG_SHARP_DISPLAY */
 		if (gpio_is_valid(ctrl_pdata->mode_gpio))
 			gpio_free(ctrl_pdata->mode_gpio);
 	}
@@ -1068,13 +938,6 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 
 	if (pinfo->compression_mode == COMPRESSION_DSC)
 		mdss_dsi_panel_dsc_pps_send(ctrl, pinfo);
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00011 */
-	if (pinfo->mipi.mode == DSI_VIDEO_MODE) {
-		pr_debug("%s, call mdss_diag_set_adjusted \n",__func__);
-		mdss_diag_set_adjusted(pdata);
-	}
-#endif /* CONFIG_SHARP_DISPLAY */
 
 	mdss_dsi_panel_on_hdmi(ctrl, pinfo);
 
@@ -3101,131 +2964,11 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	if (rc)
 		goto error;
 
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00009 */
-	rc = mdss_dsi_panel_parse_brightness(np, ctrl_pdata);
-	if (rc)
-		pr_err("failed to linear params, rc=%d\n", rc);
-#endif /* CONFIG_SHARP_DISPLAY */
-
 	return 0;
 
 error:
 	return -EINVAL;
 }
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00019 */
-static void mdss_dsi_panel_update_phy_param(struct mdss_panel_info *pinfo,
-	struct mdp_mipi_clkchg_param *update_clk)
-{
-	int i;
-
-	for (i=0; i<sizeof(pinfo->mipi.dsi_phy_db.timing); i++) {
-		pinfo->mipi.dsi_phy_db.timing[i]
-			= update_clk->host.timing_ctrl[i];
-	}
-}
-
-static void mdss_dsi_panel_update_phy_param_v2(struct mdss_panel_info *pinfo,
-	struct mdp_mipi_clkchg_param *update_clk)
-{
-	int i;
-
-	for (i = 0; i < TIMING_PARAM_DLANE_COUNT; i += 8) {
-		pinfo->mipi.dsi_phy_db.timing_8996[i]
-				= update_clk->host.timing_ctrl[5];
-		pinfo->mipi.dsi_phy_db.timing_8996[i + 1]
-				= update_clk->host.timing_ctrl[6];
-		pinfo->mipi.dsi_phy_db.timing_8996[i + 2]
-				= update_clk->host.timing_ctrl[7];
-		pinfo->mipi.dsi_phy_db.timing_8996[i + 3]
-				= update_clk->host.timing_ctrl[8];
-		pinfo->mipi.dsi_phy_db.timing_8996[i + 4]
-				= update_clk->host.timing_ctrl[9];
-		pinfo->mipi.dsi_phy_db.timing_8996[i + 5]
-				= update_clk->host.timing_ctrl[10];
-		pinfo->mipi.dsi_phy_db.timing_8996[i + 6]
-				= update_clk->host.timing_ctrl[11];
-		pinfo->mipi.dsi_phy_db.timing_8996[i + 7] = 0xA0;
-	}
-
-	for (i = TIMING_PARAM_DLANE_COUNT;
-		i < TIMING_PARAM_DLANE_COUNT + TIMING_PARAM_CLK_COUNT;
-		i += 8) {
-		pinfo->mipi.dsi_phy_db.timing_8996[i]
-				= update_clk->host.timing_ctrl[0];
-		pinfo->mipi.dsi_phy_db.timing_8996[i + 1]
-				= update_clk->host.timing_ctrl[1];
-		pinfo->mipi.dsi_phy_db.timing_8996[i + 2]
-				= update_clk->host.timing_ctrl[2];
-		pinfo->mipi.dsi_phy_db.timing_8996[i + 3]
-				= update_clk->host.timing_ctrl[3];
-		pinfo->mipi.dsi_phy_db.timing_8996[i + 4]
-				= update_clk->host.timing_ctrl[4];
-		pinfo->mipi.dsi_phy_db.timing_8996[i + 5]
-				= update_clk->host.timing_ctrl[10];
-		pinfo->mipi.dsi_phy_db.timing_8996[i + 6]
-				= update_clk->host.timing_ctrl[11];
-		pinfo->mipi.dsi_phy_db.timing_8996[i + 7] = 0xA0;
-	}
-}
-
-void mdss_dsi_panel_update_info(struct mdss_panel_data *pdata,
-	struct mdp_mipi_clkchg_param *update_clk)
-{
-	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
-	u32 phy_rev;
-
-	struct mdss_panel_info *pinfo = &(pdata->panel_info);
-	pr_debug("%s: clk_rate = %10d, xres = %10d, yres = %10d\n",
-		__func__, update_clk->host.clock_rate,
-		update_clk->host.display_width, update_clk->host.display_height);
-	pr_debug("%s: hpw = %10d, hbp = %10d, hfp = %10d\n",
-		__func__, update_clk->host.hsync_pulse_width,
-		update_clk->host.h_back_porch, update_clk->host.h_front_porch);
-	pr_debug("%s: vpw = %10d, vbp = %10d, vfp = %10d\n",
-		__func__, update_clk->host.vsync_pulse_width,
-		update_clk->host.v_back_porch, update_clk->host.v_front_porch);
-	pr_debug("%s: t_clk_post = 0x%02X, t_clk_pre = 0x%02X\n",
-		__func__, update_clk->host.t_clk_post, update_clk->host.t_clk_pre);
-	pr_debug("%s: dsi_phy_db.timing[0-11] = 0x%02X, 0x%02X, 0x%02X, 0x%02X,"
-			" 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X\n",
-			__func__, update_clk->host.timing_ctrl[0], update_clk->host.timing_ctrl[1],
-			update_clk->host.timing_ctrl[2], update_clk->host.timing_ctrl[3],
-			update_clk->host.timing_ctrl[4], update_clk->host.timing_ctrl[5],
-			update_clk->host.timing_ctrl[6], update_clk->host.timing_ctrl[7],
-			update_clk->host.timing_ctrl[8], update_clk->host.timing_ctrl[9],
-			update_clk->host.timing_ctrl[10], update_clk->host.timing_ctrl[11]);
-
-	pinfo->clk_rate = update_clk->host.clock_rate;
-		if (pinfo->is_split_display) {
-		pinfo->xres = update_clk->host.display_width / 2;
-	} else {
-		pinfo->xres = update_clk->host.display_width;
-	}
-	pinfo->yres = update_clk->host.display_height;
-	pinfo->lcdc.h_pulse_width = update_clk->host.hsync_pulse_width;
-	pinfo->lcdc.h_back_porch = update_clk->host.h_back_porch;
-	pinfo->lcdc.h_front_porch = update_clk->host.h_front_porch;
-	pinfo->lcdc.v_pulse_width = update_clk->host.vsync_pulse_width;
-	pinfo->lcdc.v_back_porch = update_clk->host.v_back_porch;
-	pinfo->lcdc.v_front_porch = update_clk->host.v_front_porch;
-	pinfo->mipi.t_clk_post = update_clk->host.t_clk_post;
-	pinfo->mipi.t_clk_pre = update_clk->host.t_clk_pre;
-
-	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
-			panel_data);
-	phy_rev = ctrl_pdata->shared_data->phy_rev;
-	switch (phy_rev) {
-	case DSI_PHY_REV_20:
-		mdss_dsi_panel_update_phy_param_v2(pinfo, update_clk);
-		break;
-
-	default:
-		mdss_dsi_panel_update_phy_param(pinfo, update_clk);
-		break;
-	}
-}
-#endif /* CONFIG_SHARP_DISPLAY */
 
 int mdss_dsi_panel_init(struct device_node *node,
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata,
@@ -3272,59 +3015,5 @@ int mdss_dsi_panel_init(struct device_node *node,
 			mdss_dsi_panel_apply_display_setting;
 	ctrl_pdata->switch_mode = mdss_dsi_panel_switch_mode;
 	ctrl_pdata->panel_data.get_idle = mdss_dsi_panel_get_idle_mode;
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00019 */
-	ctrl_pdata->update_info = mdss_dsi_panel_update_info;
-#endif /* CONFIG_SHARP_DISPLAY */
-
 	return 0;
 }
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00009 */
-static int mdss_dsi_panel_parse_brightness(struct device_node *np,
-	struct mdss_dsi_ctrl_pdata *ctrl)
-{
-	struct mdss_panel_info *pinfo = &ctrl->panel_data.panel_info;
-	int rc, i;
-	int size = 0, cnt;
-
-	pinfo->linear_params.cnt = 0;
-
-	if (of_get_property(np,
-		"sharp,mdss-dsi-linear-params", &size)) {
-		cnt = size / sizeof(int);
-	} else {
-		pr_err("%s:Property linear-params not available\n", __func__);
-		return 0;
-	}
-
-	if (!size) {
-		pr_err("%s:Property linear-params size = 0\n", __func__);
-		return 0;
-	}
-
-	pinfo->linear_params.param = kcalloc(cnt, sizeof(int), GFP_KERNEL);
-	if (!pinfo->linear_params.param) {
-		pr_err("%s:Failed to alloc mem for linear-params\n",__func__);
-		return 0;
-	}
-
-	rc = of_property_read_u32_array(np,
-		"sharp,mdss-dsi-linear-params",
-		(u32 *)pinfo->linear_params.param, cnt);
-	if (rc) {
-		pr_err("%s:Error in reading property: linear-params\n",
-			__func__);
-		return 0;
-	}
-	pinfo->linear_params.cnt = cnt / 2;
-
-	pr_debug("%s:linear_params cnt:%d\n", __func__, pinfo->linear_params.cnt);
-	for (i = 0;i < pinfo->linear_params.cnt;i++) {
-		pr_debug("%s:linear_param %d x:%d y:%d\n", __func__, i,
-			pinfo->linear_params.param[i].x,
-			pinfo->linear_params.param[i].y);
-	}
-
-	return 0;
-}
-#endif /* CONFIG_SHARP_DISPLAY */

@@ -213,9 +213,6 @@ struct smb_dt_props {
 	int			term_current_src;
 	int			term_current_thresh_hi_ma;
 	int			term_current_thresh_lo_ma;
-#ifdef CONFIG_BATTERY_SHARP
-	int			shdiag_fv_max_uv;
-#endif /* CONFIG_BATTERY_SHARP */
 };
 
 struct smb5 {
@@ -223,10 +220,6 @@ struct smb5 {
 	struct dentry		*dfs_root;
 	struct smb_dt_props	dt;
 };
-
-#ifdef CONFIG_BATTERY_SHARP
-static struct smb5 *the_chip = NULL;
-#endif /* CONFIG_BATTERY_SHARP */
 
 static int __debug_mask;
 module_param_named(
@@ -243,12 +236,10 @@ module_param_named(
 	weak_chg_icl_ua, __weak_chg_icl_ua, int, 0600
 );
 
-#ifndef CONFIG_BATTERY_SHARP
 enum {
 	USBIN_CURRENT,
 	USBIN_VOLTAGE,
 };
-#endif /* CONFIG_BATTERY_SHARP */
 
 enum {
 	BAT_THERM = 0,
@@ -377,18 +368,11 @@ static int smb5_configure_internal_pull(struct smb_charger *chg, int type,
 #define BITE_WDOG_TIMEOUT_8S		0x3
 #define BARK_WDOG_TIMEOUT_MASK		GENMASK(3, 2)
 #define BARK_WDOG_TIMEOUT_SHIFT		2
-#ifdef CONFIG_BATTERY_SHARP
-#define DEFAULT_USB_THERM_WARN_TRIG_THRESH		55000   //55[degC]
-#define DEFAULT_USB_THERM_WARN_CANCEL_THRESH	45000   //45[degC]
-#endif /* CONFIG_BATTERY_SHARP */
 static int smb5_parse_dt(struct smb5 *chip)
 {
 	struct smb_charger *chg = &chip->chg;
 	struct device_node *node = chg->dev->of_node;
 	int rc, byte_len;
-#ifdef CONFIG_BATTERY_SHARP
-	int temp;
-#endif /* CONFIG_BATTERY_SHARP */
 
 	if (!node) {
 		pr_err("device tree node missing\n");
@@ -441,14 +425,6 @@ static int smb5_parse_dt(struct smb5 *chip)
 	if (chip->dt.term_current_src == ITERM_SRC_ADC)
 		rc = of_property_read_u32(node, "qcom,chg-term-base-current-ma",
 				&chip->dt.term_current_thresh_lo_ma);
-
-#ifdef CONFIG_BATTERY_SHARP
-	rc = of_property_read_u32(node,
-				  "qcom,shdiag-fv-max-uv",
-				  &chip->dt.shdiag_fv_max_uv);
-	if (rc < 0)
-		chip->dt.shdiag_fv_max_uv = -EINVAL;
-#endif /* CONFIG_BATTERY_SHARP */
 
 	if (of_find_property(node, "qcom,thermal-mitigation", &byte_len)) {
 		chg->thermal_mitigation = devm_kzalloc(chg->dev, byte_len,
@@ -531,40 +507,10 @@ static int smb5_parse_dt(struct smb5 *chip)
 
 	chg->fcc_stepper_enable = of_property_read_bool(node,
 					"qcom,fcc-stepping-enable");
-#ifdef CONFIG_BATTERY_SHARP
-	chg->jeita_en_hot_sl_fcv = of_property_read_bool(node, "qcom,jeita-en-hot-sl-fcv");
-	chg->jeita_en_cold_sl_fcv = of_property_read_bool(node, "qcom,jeita-en-cold-sl-fcv");
-	chg->jeita_en_hot_sl_ccc = of_property_read_bool(node, "qcom,jeita-en-hot-sl-ccc");
-	chg->jeita_en_cold_sl_ccc = of_property_read_bool(node, "qcom,jeita-en-cold-sl-ccc");
-
-	rc = of_property_read_u32(node, "qcom,typec-safety-therm-ch", &temp);
-	if (rc < 0)
-		chg->typec_safety_therm_ch = 0;
-	else
-		chg->typec_safety_therm_ch = temp;
-
-	if (chg->typec_safety_therm_ch > 0) {
-		rc = of_property_read_u32(node, "qcom,typec-safety-trigger-threshold", &temp);
-		if (rc < 0)
-			chg->typec_safety_trigger_threshold = DEFAULT_USB_THERM_WARN_TRIG_THRESH;
-		else
-			chg->typec_safety_trigger_threshold = temp * 1000;
-
-		rc = of_property_read_u32(node, "qcom,typec-safety-cancel-threshold", &temp);
-		if (rc < 0)
-			chg->typec_safety_cancel_threshold = DEFAULT_USB_THERM_WARN_CANCEL_THRESH;
-		else
-			chg->typec_safety_cancel_threshold = temp * 1000;
-	} else {
-		chg->typec_safety_trigger_threshold = 0;
-		chg->typec_safety_cancel_threshold = 0;
-	}
-#endif /* CONFIG_BATTERY_SHARP */
 
 	return 0;
 }
 
-#ifndef CONFIG_BATTERY_SHARP
 static int smb5_get_adc_data(struct smb_charger *chg, int channel,
 				union power_supply_propval *val)
 {
@@ -647,7 +593,7 @@ done:
 	mutex_unlock(&chg->vadc_lock);
 	return rc;
 }
-#endif /* CONFIG_BATTERY_SHARP */
+
 
 /************************
  * USB PSY REGISTRATION *
@@ -810,24 +756,14 @@ static int smb5_usb_get_prop(struct power_supply *psy,
 			rc = smb5_get_adc_data(chg, USBIN_VOLTAGE, val);
 		break;
 	case POWER_SUPPLY_PROP_HVDCP_OPTI_ALLOWED:
-#ifdef CONFIG_BATTERY_SHARP
-		val->intval = false;
-#else
 		val->intval = !chg->flash_active;
-#endif /* CONFIG_BATTERY_SHARP */
 		break;
 	case POWER_SUPPLY_PROP_QC_OPTI_DISABLE:
-#ifdef CONFIG_BATTERY_SHARP
-		val->intval = POWER_SUPPLY_QC_THERMAL_BALANCE_DISABLE
-					| POWER_SUPPLY_QC_INOV_THERMAL_DISABLE
-					| POWER_SUPPLY_QC_CTM_DISABLE;
-#else
 		if (chg->hw_die_temp_mitigation)
 			val->intval = POWER_SUPPLY_QC_THERMAL_BALANCE_DISABLE
 					| POWER_SUPPLY_QC_INOV_THERMAL_DISABLE;
 		if (chg->hw_connector_mitigation)
 			val->intval |= POWER_SUPPLY_QC_CTM_DISABLE;
-#endif /* CONFIG_BATTERY_SHARP */
 		break;
 	case POWER_SUPPLY_PROP_MOISTURE_DETECTED:
 		val->intval = chg->moisture_present;
@@ -1329,13 +1265,6 @@ static enum power_supply_property smb5_batt_props[] = {
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
 	POWER_SUPPLY_PROP_TIME_TO_FULL_NOW,
 	POWER_SUPPLY_PROP_FCC_STEPPER_ENABLE,
-#ifdef CONFIG_BATTERY_SHARP
-	POWER_SUPPLY_PROP_CURRENT_AVG,
-	POWER_SUPPLY_PROP_CC_SAFETY_LEVEL,
-	POWER_SUPPLY_PROP_STORMING_STATUS,
-	POWER_SUPPLY_PROP_TYPEC_OVERHEAT_STATUS,
-	POWER_SUPPLY_PROP_CHARGER_ERROR_STATUS,
-#endif /* CONFIG_BATTERY_SHARP */
 };
 
 #define ITERM_SCALING_FACTOR_PMI632	1525
@@ -1505,26 +1434,6 @@ static int smb5_batt_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_FCC_STEPPER_ENABLE:
 		val->intval = chg->fcc_stepper_enable;
 		break;
-#ifdef CONFIG_BATTERY_SHARP
-	case POWER_SUPPLY_PROP_CURRENT_AVG:
-		rc = smblib_get_prop_batt_current_avg(chg, val);
-		break;
-	case POWER_SUPPLY_PROP_CC_SAFETY_LEVEL:
-		if(chg->fake_cc_safety_level >= POWER_SUPPLY_CC_SAFETY_LEVEL0 && chg->fake_cc_safety_level <= POWER_SUPPLY_CC_SAFETY_LEVEL3)
-			val->intval = chg->fake_cc_safety_level;
-		else
-			val->intval = chg->cc_safety_level;
-		break;
-	case POWER_SUPPLY_PROP_STORMING_STATUS:
-		val->intval = (int)(chg->is_storming[STORMING_SWITCHER_POWER_OK] || chg->is_storming[STORMING_USBIN_UV]);
-		break;
-	case POWER_SUPPLY_PROP_TYPEC_OVERHEAT_STATUS:
-		val->intval = (int)chg->prev_typec_usb_overheat;
-		break;
-	case POWER_SUPPLY_PROP_CHARGER_ERROR_STATUS:
-		rc = smblib_get_prop_batt_charger_error_status(chg, val);
-		break;
-#endif /* CONFIG_BATTERY_SHARP */
 	default:
 		pr_err("batt power supply prop %d not supported\n", psp);
 		return -EINVAL;
@@ -1622,12 +1531,6 @@ static int smb5_batt_set_prop(struct power_supply *psy,
 					false, 0);
 		}
 		break;
-#ifdef CONFIG_BATTERY_SHARP
-	case POWER_SUPPLY_PROP_CC_SAFETY_LEVEL:
-		chg->fake_cc_safety_level = val->intval;
-		power_supply_changed(chg->batt_psy);
-		break;
-#endif /* CONFIG_BATTERY_SHARP */
 	default:
 		rc = -EINVAL;
 	}
@@ -1650,11 +1553,6 @@ static int smb5_batt_prop_is_writeable(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_STEP_CHARGING_ENABLED:
 	case POWER_SUPPLY_PROP_SW_JEITA_ENABLED:
 	case POWER_SUPPLY_PROP_DIE_HEALTH:
-#ifdef CONFIG_BATTERY_SHARP
-	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
-	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX:
-	case POWER_SUPPLY_PROP_CC_SAFETY_LEVEL:
-#endif /* CONFIG_BATTERY_SHARP */
 	case POWER_SUPPLY_PROP_BATTERY_CHARGING_ENABLED:
 		return 1;
 	default:
@@ -1786,7 +1684,7 @@ static int smb5_init_vconn_regulator(struct smb5 *chip)
 static int smb5_configure_typec(struct smb_charger *chg)
 {
 	int rc;
-	u8 val = 0, rid_int_src = 0;
+	u8 val = 0;
 
 	rc = smblib_read(chg, LEGACY_CABLE_STATUS_REG, &val);
 	if (rc < 0) {
@@ -1852,16 +1750,6 @@ static int smb5_configure_typec(struct smb_charger *chg)
 				rc);
 			return rc;
 		}
-	/* Enable Water detection rid source interrupt */
-		rid_int_src |= TYPEC_WATER_DETECTION_INT_EN_BIT;
-	}
-
-	/* Disable rid source interrupts which are not required. */
-	rc = smblib_write(chg, TYPE_C_INTERRUPT_EN_CFG_2_REG, rid_int_src);
-	if (rc < 0) {
-		dev_err(chg->dev,
-			"Couldn't configure Type-C interrupts rc=%d\n", rc);
-		return rc;
 	}
 
 	/* Disable TypeC and RID change source interrupts */
@@ -2057,9 +1945,6 @@ static int smb5_init_hw(struct smb5 *chip)
 	struct smb_charger *chg = &chip->chg;
 	int rc, type = 0;
 	u8 val = 0;
-#ifdef CONFIG_BATTERY_SHARP
-	u8 batt_chg_stat = 0;
-#endif /* CONFIG_BATTERY_SHARP */
 
 	if (chip->dt.no_battery)
 		chg->fake_capacity = 50;
@@ -2189,9 +2074,6 @@ static int smb5_init_hw(struct smb5 *chip)
 	vote(chg->fv_votable,
 		BATT_PROFILE_VOTER, chg->batt_profile_fv_uv > 0,
 		chg->batt_profile_fv_uv);
-#ifdef CONFIG_BATTERY_SHARP
-	vote(chg->cc_disable_votable, DEFAULT_VOTER, false, 0);
-#endif /* CONFIG_BATTERY_SHARP */
 
 	/* Some h/w limit maximum supported ICL */
 	vote(chg->usb_icl_votable, HW_LIMIT_VOTER,
@@ -2379,13 +2261,6 @@ static int smb5_init_hw(struct smb5 *chip)
 		}
 	}
 
-#ifdef CONFIG_BATTERY_SHARP
-	rc = smblib_disable_hw_jeita(chg, chg->sw_jeita_enabled);
-	if (rc < 0) {
-		dev_err(chg->dev, "Couldn't set hw jeita rc=%d\n", rc);
-		return rc;
-	}
-#else
 	if (chg->sw_jeita_enabled) {
 		rc = smblib_disable_hw_jeita(chg, true);
 		if (rc < 0) {
@@ -2393,32 +2268,6 @@ static int smb5_init_hw(struct smb5 *chip)
 			return rc;
 		}
 	}
-#endif /* CONFIG_BATTERY_SHARP */
-
-#ifdef CONFIG_BATTERY_SHARP
-	rc = smblib_read(chg, BATTERY_CHARGER_STATUS_1_REG, &batt_chg_stat);
-	if (rc < 0) {
-		dev_err(chg->dev, "Couldn't read battery charger status_1 rc=%d\n",rc);
-		return rc;
-	}
-
-	if((batt_chg_stat & BATTERY_CHARGER_STATUS_MASK) ? 0 : 1){
-
-		rc = smblib_write(chg, CHARGING_ENABLE_CMD_REG,0);
-		if (rc < 0) {
-			dev_err(chg->dev, "Couldn't write charging enable cmd: enable rc=%d\n",rc);
-			return rc;
-		}
-
-		msleep(50);
-
-		rc = smblib_write(chg, CHARGING_ENABLE_CMD_REG,CHARGING_ENABLE_CMD_BIT);
-		if (rc < 0) {
-			dev_err(chg->dev, "Couldn't write charging enable cmd: disable rc=%d\n",rc);
-			return rc;
-		}
-	}
-#endif /* CONFIG_BATTERY_SHARP */
 
 	rc = smblib_configure_wdog(chg,
 			chg->step_chg_enabled || chg->sw_jeita_enabled);
@@ -2969,205 +2818,6 @@ static int smb5_show_charger_status(struct smb5 *chip)
 	return rc;
 }
 
-#ifdef CONFIG_BATTERY_SHARP
-static int smb5_shdiag_mode_initialize(const char *val, struct kernel_param *kp)
-{
-	int rc = 0;
-	struct smb_charger *chg = &the_chip->chg;
-
-	chg->thermal_control_disable = true;
-	chg->set_usb_icl_enable = true;
-
-	 /* Disable AICL for USBIN and AICL rerun*/
-	 rc = smblib_masked_write(chg,
-		USBIN_AICL_OPTIONS_CFG_REG,
-		USBIN_AICL_EN_BIT | USBIN_AICL_RERUN_EN_BIT, 0);
-	if (rc < 0)
-		pr_err("Couldn't set usbin aicl en and aicl rerun en rc = %d\n", rc);
-
-	 /* Override APSD with command register */
-	 rc = smblib_masked_write(chg,
-		CMD_ICL_OVERRIDE,
-		ICL_OVERRIDE_BIT, ICL_OVERRIDE_BIT);
-	if (rc < 0)
-		pr_err("Couldn't set override rc = %d\n", rc);
-
-	chg->step_chg_enabled = false;
-	/* Disable step charging */
-	rc = smblib_masked_write(chg,
-		CHGR_STEP_CHG_MODE_CFG_REG,
-		STEP_CHARGING_ENABLE_BIT, 0);
-	if (rc < 0)
-		pr_err("Couldn't set step charging en rc = %d\n", rc);
-
-	vote(chg->pl_disable_votable, CHG_STATE_VOTER, true, 0);
-	vote(chg->usb_icl_votable, DCP_VOTER, false, 0);
-	vote(chg->usb_icl_votable, USB_PSY_VOTER, true, 900000);
-	if (the_chip->dt.shdiag_fv_max_uv != -EINVAL)
-		vote(chg->fv_votable, BATT_PROFILE_VOTER, true, the_chip->dt.shdiag_fv_max_uv);
-
-
-	return rc;
-}
-module_param_call(param_shdiag_mode_initialize, smb5_shdiag_mode_initialize, NULL, NULL, 0644);
-
-static int battery_charging_enabled_set(const char *val, struct kernel_param *kp)
-{
-    int ret,value;
-    struct smb_charger *chg = &the_chip->chg;
-
-    pr_debug("%s S\n", __func__);
-
-    ret = kstrtoint(val, 0, &value);
-
-    value = value ? false:true;
-
-    if(!ret) {
-        pr_debug("%s set value to %d \n", __func__, value);
-        vote(chg->chg_disable_votable, DEFAULT_VOTER, value, 0);
-    }
-
-    pr_debug("%s E\n", __func__);
-
-    return ret;
-}
-static int battery_charging_enabled_get(char *buf, struct kernel_param *kp)
-{
-    int ret, value;
-    struct smb_charger *chg = &the_chip->chg;
-
-    pr_debug("%s S\n", __func__);
-
-    value = get_effective_result_locked(chg->chg_disable_votable);
-    value = value ? false:true;
-    ret = sprintf(buf, "%d", value);
-
-    pr_debug("%s E\n", __func__);
-
-    return ret;
-}
-module_param_call(param_battery_charging_enabled, battery_charging_enabled_set, battery_charging_enabled_get, NULL, 0644);
-
-static int input_current_max_set(const char *val, struct kernel_param *kp)
-{
-    int ret,value;
-    struct smb_charger *chg = &the_chip->chg;
-
-    pr_debug("%s S\n", __func__);
-
-    ret = kstrtoint(val, 0, &value);
-
-    if(!ret) {
-        pr_debug("%s set value to %d \n", __func__, value);
-        vote(chg->usb_icl_votable, USB_PSY_VOTER, true, value);
-    }
-
-    pr_debug("%s E\n", __func__);
-
-    return ret;
-}
-static int input_current_max_get(char *buf, struct kernel_param *kp)
-{
-    int ret, value;
-    struct smb_charger *chg = &the_chip->chg;
-
-    pr_debug("%s S\n", __func__);
-
-    value = get_effective_result_locked(chg->usb_icl_votable);
-    ret = sprintf(buf, "%d", value);
-
-    pr_debug("%s E\n", __func__);
-
-    return ret;
-}
-module_param_call(param_input_current_max, input_current_max_set, input_current_max_get, NULL, 0644);
-
-static int smb5_lcd_on_get(char *buf, struct kernel_param *kp)
-{
-   int ret, level=0;
-    ret = sprintf(buf, "%d", level);
-
-    pr_debug("%s E\n", __func__);
-
-    return ret;
-}
-module_param_call(param_lcd_on, NULL, smb5_lcd_on_get, NULL, 0444);
-
-static int smb5_boot_completed_get(char *buf, struct kernel_param *kp)
-{
-    int ret, usb_therm;
-    struct smb_charger *chg = &the_chip->chg;
-
-    pr_debug("%s S\n", __func__);
-
-	ret = smblib_get_usb_therm(chg, &usb_therm);
-	if(ret < 0)
-	{
-		pr_err("[E] %s() Couldn't get usb_therm ret=%d.\n", __FUNCTION__ , ret);
-		return ret;
-	}
-
-	pr_debug("%s usb_therm=%d\n", __func__, usb_therm);
-
-	if(usb_therm > chg->typec_safety_trigger_threshold)
-	{
-		cancel_delayed_work_sync(&chg->typec_usb_therm_work);
-		schedule_delayed_work(&chg->typec_usb_therm_work, msecs_to_jiffies(0));
-	}
-
-    ret = sprintf(buf, "%d", chg->typec_usb_overheat);
-	power_supply_changed(chg->batt_psy);
-
-	pr_debug("%s typec_usb_overheat=%d\n", __func__, chg->typec_usb_overheat);
-    pr_debug("%s E\n", __func__);
-
-    return ret;
-}
-module_param_call(param_boot_completed, NULL, smb5_boot_completed_get, NULL, 0444);
-
-static int offcharge_mode_set(const char *val, struct kernel_param *kp)
-{
-	int ret,value;
-	struct smb_charger *chg = &the_chip->chg;
-
-	pr_debug("%s S\n", __func__);
-
-	ret = kstrtoint(val, 0, &value);
-
-	if(!ret) {
-		if(value == 1)
-			 chg->offcharge_mode = true;
-		else if(value == 0)
-			chg->offcharge_mode = false;
-		pr_debug("%s offcharge mode is %d \n", __func__, value);
-	}
-
-	pr_debug("%s E\n", __func__);
-
-	return ret;
-}
-static int offcharge_mode_get(char *buf, struct kernel_param *kp)
-{
-	int ret;
-	struct smb_charger *chg = &the_chip->chg;
-
-	pr_debug("%s S\n", __func__);
-
-	ret = sprintf(buf, "%d", chg->offcharge_mode);
-
-	pr_debug("%s E\n", __func__);
-
-	return ret;
-}
-module_param_call(param_offcharge_mode, offcharge_mode_set, offcharge_mode_get, NULL, 0644);
-
-int smblib_debug_usb_therm = 0;
-
-module_param_named(
-	debug_usb_therm, smblib_debug_usb_therm, int, S_IRUSR | S_IWUSR
-);
-#endif /* CONFIG_BATTERY_SHARP */
-
 static int smb5_probe(struct platform_device *pdev)
 {
 	struct smb5 *chip;
@@ -3177,10 +2827,6 @@ static int smb5_probe(struct platform_device *pdev)
 	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
 	if (!chip)
 		return -ENOMEM;
-
-#ifdef CONFIG_BATTERY_SHARP
-	the_chip = chip;
-#endif /* CONFIG_BATTERY_SHARP */
 
 	chg = &chip->chg;
 	chg->dev = &pdev->dev;

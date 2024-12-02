@@ -42,23 +42,10 @@
 
 #define PWM_PERIOD_DEFAULT_NS		1000000
 
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00038 */
-#ifndef MAX
-#define  MAX(x, y) (((x) > (y)) ? (x) : (y))
-#endif
-#define QPNP_TRI_LED_RED	0
-#define QPNP_TRI_LED_GREEN	1
-#define QPNP_TRI_LED_BLUE	2
-#endif /* CONFIG_LEDS_SHARP */
-
 struct pwm_setting {
 	u64	pre_period_ns;
 	u64	period_ns;
 	u64	duty_ns;
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00037 */
-	u64	period_ns_u64;
-	u64	duty_ns_u64;
-#endif /* CONFIG_LEDS_SHARP */
 };
 
 struct led_setting {
@@ -81,9 +68,6 @@ struct qpnp_led_dev {
 	u8			id;
 	bool			blinking;
 	bool			breathing;
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00038 */
-	u32			calib;
-#endif /* CONFIG_LEDS_SHARP */
 };
 
 struct qpnp_tri_led_chip {
@@ -95,78 +79,6 @@ struct qpnp_tri_led_chip {
 	u16			reg_base;
 	u8			subtype;
 };
-
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00038 */
-static char qpnp_led_system_color[32];
-static u32 calib_enabled = 0;
-module_param_string(system_color, qpnp_led_system_color, sizeof(qpnp_led_system_color), 0);
-module_param(calib_enabled, uint, S_IRUGO | S_IWUSR);
-
-static u32 qpnp_tri_led_calib_brightness(struct qpnp_led_dev *led)
-{
-	pr_debug("%s: in %s LED calib_enabled=%d\n", __func__, led->cdev.name, calib_enabled);
-	if (led->led_setting.brightness && calib_enabled &&
-		led->calib && !led->led_setting.blink && !led->led_setting.breath) {
-		return MAX(led->led_setting.brightness * led->calib / LED_FULL, 1);
-	} else {
-		return led->cdev.brightness;
-	}
-}
-
-static void qpnp_tri_led_calib_read_clrvari_param(struct qpnp_led_dev *led)
-{
-	struct device_node *root, *node;
-	u32 color;
-	char default_name[32];
-	int rc = -EINVAL;
-
-	pr_debug("%s: in %s LED node=%s\n", __func__, led->cdev.name, qpnp_led_system_color);
-
-	root = of_find_node_by_name(NULL, "sharp,shled_leds_color_variation");
-	if (!root) {
-		pr_err("%s: could not find root node.\n", __func__);
-		goto calib_read_error;
-	}
-
-	node = of_find_node_by_name(root, qpnp_led_system_color);
-	if (!node) {
-		pr_err("%s: could not find node %s, try default.\n", __func__, qpnp_led_system_color);
-		rc = of_property_read_u32(root, "sharp,system-color-default", &color);
-		if (rc < 0) {
-			pr_err("%s: could not find default node.\n", __func__);
-			goto calib_read_error;
-		}
-		snprintf(default_name, sizeof(default_name), "sharp,shled-leds-calib-%02x", color);
-		pr_debug("%s: default_name=%s\n", __func__, default_name);
-		node = of_find_node_by_name(root, default_name);
-		if (!node) {
-			pr_err("%s: could not find node %s.\n", __func__, default_name);
-			goto calib_read_error;
-		}
-	}
-
-	if (led->id == QPNP_TRI_LED_RED) {
-		rc = of_property_read_u32(node, "red", &led->calib);
-	} else if (led->id == QPNP_TRI_LED_GREEN) {
-		rc = of_property_read_u32(node, "green", &led->calib);
-	} else if (led->id == QPNP_TRI_LED_BLUE) {
-		rc = of_property_read_u32(node, "blue", &led->calib);
-	}
-	pr_debug("%s: led->calib=%d.\n", __func__, led->calib);
-	if (rc) {
-		pr_err("%s: could not find calibration parameter param:%s led->id:%d.\n", __func__, qpnp_led_system_color, led->id);
-		goto calib_read_error;
-	}
-
-	calib_enabled = 1;
-
-	return;
-
-calib_read_error:
-	calib_enabled = 0;
-	return;
-}
-#endif /* CONFIG_LEDS_SHARP */
 
 static int qpnp_tri_led_read(struct qpnp_tri_led_chip *chip, u16 addr, u8 *val)
 {
@@ -213,19 +125,7 @@ static int __tri_led_config_pwm(struct qpnp_led_dev *led,
 		PWM_OUTPUT_MODULATED : PWM_OUTPUT_FIXED;
 	/* Use default pattern in PWM device */
 	pstate.output_pattern = NULL;
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00037 */
-	if (led->led_setting.blink) {
-		pstate.period_u64 = pwm->period_ns_u64;
-		pstate.duty_cycle_u64 = pwm->duty_ns_u64;
-		rc = pwm_apply_state_u64(led->pwm_dev, &pstate);
-	} else {
-		pstate.period_u64 = 0;
-		pstate.duty_cycle_u64 = 0;
-		rc = pwm_apply_state(led->pwm_dev, &pstate);
-	}
-#else /* CONFIG_LEDS_SHARP */
 	rc = pwm_apply_state(led->pwm_dev, &pstate);
-#endif /* CONFIG_LEDS_SHARP */
 
 	if (rc < 0)
 		dev_err(led->chip->dev, "Apply PWM state for %s led failed, rc=%d\n",
@@ -265,20 +165,8 @@ static int __tri_led_set(struct qpnp_led_dev *led)
 static int qpnp_tri_led_set(struct qpnp_led_dev *led)
 {
 	u64 on_ms, off_ms, period_ns, duty_ns;
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00038 */
-	u32 brightness = qpnp_tri_led_calib_brightness(led);
-#else
 	enum led_brightness brightness = led->led_setting.brightness;
-#endif /* CONFIG_LEDS_SHARP */
 	int rc = 0;
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00037 */
-	u64 period_ns_u64 = 0, duty_ns_u64 = 0;
-#endif /* CONFIG_LEDS_SHARP */
-
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00038 */
-	pr_debug("%s: brightness=%d calib_brightness=%d\n", __func__,
-		led->led_setting.brightness, brightness);
-#endif /* CONFIG_LEDS_SHARP */
 
 	if (led->led_setting.blink) {
 		on_ms = led->led_setting.on_ms;
@@ -289,14 +177,6 @@ static int qpnp_tri_led_set(struct qpnp_led_dev *led)
 
 		if (period_ns < duty_ns && duty_ns != 0)
 			period_ns = duty_ns + 1;
-
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00037 */
-		duty_ns_u64 = on_ms * NSEC_PER_MSEC;
-		period_ns_u64 = (on_ms + off_ms) * NSEC_PER_MSEC;
-
-		led->pwm_setting.duty_ns_u64 = duty_ns_u64;
-		led->pwm_setting.period_ns_u64 = period_ns_u64;
-#endif /* CONFIG_LEDS_SHARP */
 	} else {
 		/* Use initial period if no blinking is required */
 		period_ns = led->pwm_setting.pre_period_ns;
@@ -312,10 +192,6 @@ static int qpnp_tri_led_set(struct qpnp_led_dev *led)
 	}
 	dev_dbg(led->chip->dev, "PWM settings for %s led: period = %lluns, duty = %lluns\n",
 				led->cdev.name, period_ns, duty_ns);
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00038 */
-	pr_debug("%s: duty_ns=%llu period_ns=%llu brightness=%d calib_enabled=%d calib=%d calib_brightness=%d\n",
-		__func__, duty_ns, period_ns, led->led_setting.brightness, calib_enabled, led->calib, brightness);
-#endif /* CONFIG_LEDS_SHARP */
 
 	led->pwm_setting.duty_ns = duty_ns;
 	led->pwm_setting.period_ns = period_ns;
@@ -344,13 +220,8 @@ static int qpnp_tri_led_set(struct qpnp_led_dev *led)
 	return rc;
 }
 
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00044 */
-static void qpnp_tri_led_set_brightness(struct led_classdev *led_cdev,
-		enum led_brightness brightness)
-#else /* CONFIG_LEDS_SHARP */
 static int qpnp_tri_led_set_brightness(struct led_classdev *led_cdev,
 		enum led_brightness brightness)
-#endif /* CONFIG_LEDS_SHARP */
 {
 	struct qpnp_led_dev *led =
 		container_of(led_cdev, struct qpnp_led_dev, cdev);
@@ -363,11 +234,7 @@ static int qpnp_tri_led_set_brightness(struct led_classdev *led_cdev,
 	if (brightness == led->led_setting.brightness &&
 			!led->blinking && !led->breathing) {
 		mutex_unlock(&led->lock);
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00044 */
-		return;
-#else /* CONFIG_LEDS_SHARP */
 		return 0;
-#endif /* CONFIG_LEDS_SHARP */
 	}
 
 	led->led_setting.brightness = brightness;
@@ -385,11 +252,7 @@ static int qpnp_tri_led_set_brightness(struct led_classdev *led_cdev,
 
 	mutex_unlock(&led->lock);
 
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00044 */
-	return;
-#else /* CONFIG_LEDS_SHARP */
 	return rc;
-#endif /* CONFIG_LEDS_SHARP */
 }
 
 static enum led_brightness qpnp_tri_led_get_brightness(
@@ -494,11 +357,7 @@ static int qpnp_tri_led_register(struct qpnp_tri_led_chip *chip)
 		mutex_init(&led->lock);
 		led->cdev.name = led->label;
 		led->cdev.max_brightness = LED_FULL;
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00044 */
-		led->cdev.brightness_set = qpnp_tri_led_set_brightness;
-#else /* CONFIG_LEDS_SHARP */
 		led->cdev.brightness_set_blocking = qpnp_tri_led_set_brightness;
-#endif /* CONFIG_LEDS_SHARP */
 		led->cdev.brightness_get = qpnp_tri_led_get_brightness;
 		led->cdev.blink_set = qpnp_tri_led_set_blink;
 		led->cdev.default_trigger = led->default_trigger;
@@ -634,10 +493,6 @@ static int qpnp_tri_led_parse_dt(struct qpnp_tri_led_chip *chip)
 
 		led->default_trigger = of_get_property(child_node,
 				"linux,default-trigger", NULL);
-
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00038 */
-		qpnp_tri_led_calib_read_clrvari_param(led);
-#endif /* CONFIG_LEDS_SHARP */
 	}
 
 	return rc;

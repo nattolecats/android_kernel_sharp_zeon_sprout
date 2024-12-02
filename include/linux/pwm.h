@@ -81,10 +81,6 @@ struct pwm_state {
 	u64 period;
 	u64 duty_cycle;
 	enum pwm_polarity polarity;
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00037 */
-	u64 period_u64;
-	u64 duty_cycle_u64;
-#endif /* CONFIG_LEDS_SHARP */
 	enum pwm_output_type output_type;
 	struct pwm_output_pattern *output_pattern;
 	bool enabled;
@@ -353,10 +349,6 @@ struct pwm_ops {
 		      int duty_ns, int period_ns);
 	int (*config_extend)(struct pwm_chip *chip, struct pwm_device *pwm,
 		      u64 duty_ns, u64 period_ns);
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00037 */
-	int (*config_u64)(struct pwm_chip *chip, struct pwm_device *pwm,
-		      long duty_ns_u64, long period_ns_u64);
-#endif /* CONFIG_LEDS_SHARP */
 	int (*set_polarity)(struct pwm_chip *chip, struct pwm_device *pwm,
 			    enum pwm_polarity polarity);
 	int (*capture)(struct pwm_chip *chip, struct pwm_device *pwm,
@@ -423,9 +415,6 @@ struct pwm_capture {
 struct pwm_device *pwm_request(int pwm_id, const char *label);
 void pwm_free(struct pwm_device *pwm);
 int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state);
-#ifdef CONFIG_LEDS_SHARP /* CUST_ID_00037 */
-int pwm_apply_state_u64(struct pwm_device *pwm, struct pwm_state *state);
-#endif /* CONFIG_LEDS_SHARP */
 int pwm_adjust_config(struct pwm_device *pwm);
 
 /**

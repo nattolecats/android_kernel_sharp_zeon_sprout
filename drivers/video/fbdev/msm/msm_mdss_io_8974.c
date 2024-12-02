@@ -1644,12 +1644,10 @@ bool is_diff_frame_rate(struct mdss_panel_info *panel_info,
 int mdss_dsi_clk_div_config(struct mdss_panel_info *panel_info,
 			    int frame_rate)
 {
-#ifndef CONFIG_SHARP_DISPLAY /* CUST_ID_00031 */
 	struct mdss_panel_data *pdata  = container_of(panel_info,
 			struct mdss_panel_data, panel_info);
 	struct  mdss_dsi_ctrl_pdata *ctrl_pdata = container_of(pdata,
 			struct mdss_dsi_ctrl_pdata, panel_data);
-#endif /* CONFIG_SHARP_DISPLAY */
 	u64 h_period, v_period, clk_rate;
 	u32 dsi_pclk_rate;
 	u8 lanes = 0, bpp;
@@ -1681,13 +1679,8 @@ int mdss_dsi_clk_div_config(struct mdss_panel_info *panel_info,
 	h_period = mdss_panel_get_htotal(panel_info, true);
 	v_period = mdss_panel_get_vtotal(panel_info);
 
-#ifndef CONFIG_SHARP_DISPLAY /* CUST_ID_00031 */
 	if (ctrl_pdata->refresh_clk_rate || is_diff_frame_rate(panel_info,
 			frame_rate) || (!panel_info->clk_rate)) {
-#else
-	if (is_diff_frame_rate(panel_info,
-			frame_rate) || (!panel_info->clk_rate)) {
-#endif /* CONFIG_SHARP_DISPLAY */
 		if (lanes > 0) {
 			panel_info->clk_rate = h_period * v_period * frame_rate
 				* bpp * 8;

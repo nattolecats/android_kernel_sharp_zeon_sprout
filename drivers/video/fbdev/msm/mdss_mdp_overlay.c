@@ -259,17 +259,10 @@ int mdss_mdp_overlay_req_check(struct msm_fb_data_type *mfd,
 	 * Cursor overlays are only supported for targets
 	 * with dedicated cursors within VP
 	 */
-#ifndef CONFIG_SHARP_DISPLAY /* CUST_ID_00005 */
 	if ((req->pipe_type == MDSS_MDP_PIPE_TYPE_CURSOR) &&
 		((req->z_order != HW_CURSOR_STAGE(mdata)) ||
 		 !mdata->ncursor_pipes ||
 		 (req->src_rect.w > mdata->max_cursor_size))) {
-#else /* CONFIG_SHARP_DISPLAY */
-	if ((req->pipe_type == PIPE_TYPE_CURSOR) &&
-		((req->z_order != HW_CURSOR_STAGE(mdata)) ||
-		 !mdata->ncursor_pipes ||
-		 (req->src_rect.w > mdata->max_cursor_size))) {
-#endif /* CONFIG_SHARP_DISPLAY */
 		pr_err("Incorrect cursor overlay cursor_pipes=%d zorder=%d\n",
 			mdata->ncursor_pipes, req->z_order);
 		return -EINVAL;
@@ -2988,10 +2981,6 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 	ret = mdss_mdp_display_wait4comp(mdp5_data->ctl);
 	ATRACE_END("display_wait4comp");
 	mdss_mdp_splash_cleanup(mfd, true);
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00019 */
-	ret = mdss_mdp_ctl_update_mipiclk(ctl);
-#endif /* CONFIG_SHARP_DISPLAY */
 
 	/*
 	 * Configure Timing Engine, if new fps was set.

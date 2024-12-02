@@ -4191,23 +4191,12 @@ int mdss_compat_overlay_ioctl(struct fb_info *info, unsigned int cmd,
 			return ret;
 		}
 		ret = __from_user_mdp_overlay(ov, ov32);
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00008 */
-		if (ret) {
-			pr_err("%s: compat mdp overlay failed\n", __func__);
-		} else {
-			ret = mdss_fb_do_ioctl(info, cmd,
-				(unsigned long) ov, file);
-			if (!ret)
-				ret = __to_user_mdp_overlay(ov32, ov);
-		}
-#else /* CONFIG_SHARP_DISPLAY */
 		if (ret)
 			pr_err("%s: compat mdp overlay failed\n", __func__);
 		else
 			ret = mdss_fb_do_ioctl(info, cmd,
 				(unsigned long) ov, file);
 		ret = __to_user_mdp_overlay(ov32, ov);
-#endif /* CONFIG_SHARP_DISPLAY */
 		break;
 	case MSMFB_OVERLAY_SET:
 		alloc_size += sizeof(*ov) + __pp_sspp_size();
@@ -4229,12 +4218,7 @@ int mdss_compat_overlay_ioctl(struct fb_info *info, unsigned int cmd,
 		} else {
 			ret = mdss_fb_do_ioctl(info, cmd,
 				(unsigned long) ov, file);
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00008 */
-			if (!ret)
-				ret = __to_user_mdp_overlay(ov32, ov);
-#else /* CONFIG_SHARP_DISPLAY */
 			ret = __to_user_mdp_overlay(ov32, ov);
-#endif /* CONFIG_SHARP_DISPLAY */
 		}
 		break;
 	case MSMFB_OVERLAY_PREPARE:

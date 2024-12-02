@@ -20,20 +20,8 @@
 #include "msm_sensor_driver.h"
 
 /* Logging macro */
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#if 0
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
-#else
-#define CONFIG_MSMB_CAMERA_DEBUG_SH
-#undef CDBG
-#ifdef CONFIG_MSMB_CAMERA_DEBUG_SH
-#define CDBG(fmt, args...) pr_err(fmt, ##args)
-#else
-#define CDBG(fmt, args...) do { } while (0)
-#endif
-#endif
-/* SHLOCAL_CAMERA_DRIVERS<- */
 
 #define SENSOR_MAX_MOUNTANGLE (360)
 

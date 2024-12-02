@@ -39,8 +39,6 @@
 #include <linux/acpi.h>
 #include <linux/highmem.h>
 
-#include "sh_spi_util.h"
-
 #define CREATE_TRACE_POINTS
 #include <trace/events/spi.h>
 
@@ -424,6 +422,12 @@ static LIST_HEAD(spi_master_list);
  */
 static DEFINE_MUTEX(board_lock);
 
+/*
+ * Prevents addition of devices with same chip select and
+ * addition of devices below an unregistering controller.
+ */
+static DEFINE_MUTEX(spi_add_lock);
+
 /**
  * spi_alloc_device - Allocate a new SPI device
  * @master: Controller to which device is connected
@@ -502,7 +506,6 @@ static int spi_dev_check(struct device *dev, void *data)
  */
 int spi_add_device(struct spi_device *spi)
 {
-	static DEFINE_MUTEX(spi_add_lock);
 	struct spi_master *master = spi->master;
 	struct device *dev = master->dev.parent;
 	int status;
@@ -528,6 +531,13 @@ int spi_add_device(struct spi_device *spi)
 	if (status) {
 		dev_err(dev, "chipselect %d already in use\n",
 				spi->chip_select);
+		goto done;
+	}
+
+	/* Controller may unregister concurrently */
+	if (IS_ENABLED(CONFIG_SPI_DYNAMIC) &&
+	    !device_is_registered(&master->dev)) {
+		status = -ENODEV;
 		goto done;
 	}
 
@@ -987,8 +997,6 @@ static int spi_transfer_one_message(struct spi_master *master,
 	struct spi_statistics *statm = &master->statistics;
 	struct spi_statistics *stats = &msg->spi->statistics;
 
-	SH_SPILOG_DEBUG(SH_LOG_TRACE_M, &master->dev, "start\n");
-
 	spi_set_cs(msg->spi, true);
 
 	SPI_STATISTICS_INCREMENT_FIELD(statm, messages);
@@ -1079,7 +1087,6 @@ out:
 
 	spi_finalize_current_message(master);
 
-	SH_SPILOG_DEBUG(SH_LOG_TRACE_M, &master->dev, "end ret:%d\n", ret);
 	return ret;
 }
 
@@ -1832,6 +1839,47 @@ struct spi_master *spi_alloc_master(struct device *dev, unsigned size)
 }
 EXPORT_SYMBOL_GPL(spi_alloc_master);
 
+static void devm_spi_release_master(struct device *dev, void *master)
+{
+	spi_master_put(*(struct spi_master **)master);
+}
+
+/**
+ * devm_spi_alloc_master - resource-managed spi_alloc_master()
+ * @dev: physical device of SPI master
+ * @size: how much zeroed driver-private data to allocate
+ * Context: can sleep
+ *
+ * Allocate an SPI master and automatically release a reference on it
+ * when @dev is unbound from its driver.  Drivers are thus relieved from
+ * having to call spi_master_put().
+ *
+ * The arguments to this function are identical to spi_alloc_master().
+ *
+ * Return: the SPI master structure on success, else NULL.
+ */
+struct spi_master *devm_spi_alloc_master(struct device *dev, unsigned int size)
+{
+	struct spi_master **ptr, *master;
+
+	ptr = devres_alloc(devm_spi_release_master, sizeof(*ptr),
+			   GFP_KERNEL);
+	if (!ptr)
+		return NULL;
+
+	master = spi_alloc_master(dev, size);
+	if (master) {
+		master->devm_allocated = true;
+		*ptr = master;
+		devres_add(dev, ptr);
+	} else {
+		devres_free(ptr);
+	}
+
+	return master;
+}
+EXPORT_SYMBOL_GPL(devm_spi_alloc_master);
+
 #ifdef CONFIG_OF
 static int of_spi_register_master(struct spi_master *master)
 {
@@ -2030,7 +2078,11 @@ static int __unregister(struct device *dev, void *null)
  */
 void spi_unregister_master(struct spi_master *master)
 {
-	int dummy;
+	/* Prevent addition of new devices, unregister existing ones */
+	if (IS_ENABLED(CONFIG_SPI_DYNAMIC))
+		mutex_lock(&spi_add_lock);
+
+	device_for_each_child(&master->dev, NULL, __unregister);
 
 	if (master->queued) {
 		if (spi_destroy_queue(master))
@@ -2041,8 +2093,16 @@ void spi_unregister_master(struct spi_master *master)
 	list_del(&master->list);
 	mutex_unlock(&board_lock);
 
-	dummy = device_for_each_child(&master->dev, NULL, __unregister);
-	device_unregister(&master->dev);
+	device_del(&master->dev);
+
+	/* Release the last reference on the master if its driver
+	 * has not yet been converted to devm_spi_alloc_master().
+	 */
+	if (!master->devm_allocated)
+		put_device(&master->dev);
+
+	if (IS_ENABLED(CONFIG_SPI_DYNAMIC))
+		mutex_unlock(&spi_add_lock);
 }
 EXPORT_SYMBOL_GPL(spi_unregister_master);
 
@@ -2710,8 +2770,6 @@ int spi_async(struct spi_device *spi, struct spi_message *message)
 	int ret;
 	unsigned long flags;
 
-	SH_SPILOG_DEBUG(SH_LOG_TRACE_H, &spi->dev, "start\n");
-
 	ret = __spi_validate(spi, message);
 	if (ret != 0)
 		return ret;
@@ -2724,8 +2782,6 @@ int spi_async(struct spi_device *spi, struct spi_message *message)
 		ret = __spi_async(spi, message);
 
 	spin_unlock_irqrestore(&master->bus_lock_spinlock, flags);
-
-	SH_SPILOG_DEBUG(SH_LOG_TRACE_H, &spi->dev, "end ret:%d\n", ret);
 
 	return ret;
 }
@@ -2768,8 +2824,6 @@ int spi_async_locked(struct spi_device *spi, struct spi_message *message)
 	int ret;
 	unsigned long flags;
 
-	SH_SPILOG_DEBUG(SH_LOG_TRACE_H, &spi->dev, "start\n");
-
 	ret = __spi_validate(spi, message);
 	if (ret != 0)
 		return ret;
@@ -2779,8 +2833,6 @@ int spi_async_locked(struct spi_device *spi, struct spi_message *message)
 	ret = __spi_async(spi, message);
 
 	spin_unlock_irqrestore(&master->bus_lock_spinlock, flags);
-
-	SH_SPILOG_DEBUG(SH_LOG_TRACE_H, &spi->dev, "end ret:%d\n", ret);
 
 	return ret;
 
@@ -2935,13 +2987,9 @@ int spi_sync(struct spi_device *spi, struct spi_message *message)
 {
 	int ret;
 
-	SH_SPILOG_DEBUG(SH_LOG_TRACE_H, &spi->dev, "start\n");
-
 	mutex_lock(&spi->master->bus_lock_mutex);
 	ret = __spi_sync(spi, message);
 	mutex_unlock(&spi->master->bus_lock_mutex);
-
-	SH_SPILOG_DEBUG(SH_LOG_TRACE_H, &spi->dev, "end ret:%d\n", ret);
 
 	return ret;
 }
@@ -2965,19 +3013,7 @@ EXPORT_SYMBOL_GPL(spi_sync);
  */
 int spi_sync_locked(struct spi_device *spi, struct spi_message *message)
 {
-#if defined(CONFIG_SHARP_SPI_EXPAND_DEBUG_FUNCTION)
-	int ret;
-
-	SH_SPILOG_DEBUG(SH_LOG_TRACE_H, &spi->dev, "start\n");
-
-	ret = __spi_sync(spi, message);
-
-	SH_SPILOG_DEBUG(SH_LOG_TRACE_H, &spi->dev, "end ret:%d\n", ret);
-
-	return ret;
-#else
 	return __spi_sync(spi, message);
-#endif	/* defined(CONFIG_SHARP_SPI_EXPAND_DEBUG_FUNCTION) */
 }
 EXPORT_SYMBOL_GPL(spi_sync_locked);
 
@@ -3072,8 +3108,6 @@ int spi_write_then_read(struct spi_device *spi,
 	struct spi_transfer	x[2];
 	u8			*local_buf;
 
-	SH_SPILOG_DEBUG(SH_LOG_TRACE_H, &spi->dev, "start\n");
-
 	/* Use preallocated DMA-safe buffer if we can.  We can't avoid
 	 * copying here, (as a pure convenience thing), but we can
 	 * keep heap costs out of the hot path unless someone else is
@@ -3112,8 +3146,6 @@ int spi_write_then_read(struct spi_device *spi,
 		mutex_unlock(&lock);
 	else
 		kfree(local_buf);
-
-	SH_SPILOG_DEBUG(SH_LOG_TRACE_H, &spi->dev, "end status:%d\n", status);
 
 	return status;
 }

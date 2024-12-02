@@ -57,10 +57,7 @@
 #include "mdss_smmu.h"
 
 #include "mdss_mdp_trace.h"
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_0006 */
-#include <soc/qcom/sh_smem.h>
-#include "msm_mdss_context.h"
-#endif /* CONFIG_SHARP_DISPLAY */
+
 #define AXI_HALT_TIMEOUT_US	0x4000
 #define AUTOSUSPEND_TIMEOUT_MS	200
 #define DEFAULT_MDP_PIPE_WIDTH	2048
@@ -278,13 +275,6 @@ static int mdss_mdp_parse_dt_bus_scale(struct platform_device *pdev);
 static int mdss_mdp_parse_dt_ppb_off(struct platform_device *pdev);
 static int mdss_mdp_parse_dt_cdm(struct platform_device *pdev);
 static int mdss_mdp_parse_dt_dsc(struct platform_device *pdev);
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_0006 */
-int mdss_set_lcd_status(struct platform_device *pdev);
-#endif /* CONFIG_SHARP_DISPLAY */
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00022 */
-static void mdss_mdp_get_info(struct mdss_data_type *mdata, char *pan_cfg);
-static int mdss_mdp_get_info_otp(struct mdss_data_type *mdata, char *pan_cfg);
-#endif /* CONFIG_SHARP_DISPLAY */
 
 static inline u32 is_mdp_irq_enabled(void)
 {
@@ -2290,65 +2280,6 @@ void mdss_mdp_footswitch_ctrl_splash(int on)
 	}
 }
 
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00022 */
-static void mdss_mdp_get_info(struct mdss_data_type *mdata, char *pan_cfg)
-{
-	int ret = 0;
-
-	ret = mdss_mdp_get_info_otp(mdata, pan_cfg);
-	if (ret) {
-		pr_warn("unable to panel info\n");
-	}
-
-	return;
-}
-
-static int mdss_mdp_get_info_otp(struct mdss_data_type *mdata, char *pan_cfg)
-{
-	char dsi_cfg[8];
-	char *cfg_prim = NULL, *cfg_sec = NULL;
-	int i = 0;
-	long data;
-	int ret;
-
-	if (pan_cfg) {
-		cfg_prim = strnstr(pan_cfg, "otp:", strlen(pan_cfg));
-	}
-	if (cfg_prim) {
-		cfg_prim += 4;
-
-		cfg_sec = strnchr(cfg_prim, strlen(cfg_prim), ':');
-		if (cfg_sec == NULL) {
-			cfg_sec = cfg_prim + strlen(cfg_prim);
-		}
-
-		for (i = 0; ((cfg_prim + i) < cfg_sec) &&
-		     (*(cfg_prim+i) != '#'); i++) {
-			dsi_cfg[i] = *(cfg_prim + i);
-		}
-
-		dsi_cfg[i] = '\0';
-
-		ret = kstrtol(dsi_cfg, 16, &data);
-		if (ret) {
-			memset(&mdata->panel_otp_info, 0x00, sizeof(mdata->panel_otp_info));
-			pr_err("%s: invalid otp: [%s] conv err\n", __func__, dsi_cfg);
-			return -EINVAL;
-		}
-		pr_debug("%s: otp: is 0x%08lX\n", __func__, data);
-
-		mdata->panel_otp_info.status = ((data >> 16) & 0xFF);
-		mdata->panel_otp_info.a = ((data >> 8) & 0xFF);
-		mdata->panel_otp_info.b = (data & 0xFF);
-	} else {
-		memset(&mdata->panel_otp_info, 0x00, sizeof(mdata->panel_otp_info));
-		pr_err("%s: invalid otp: is nothing\n", __func__);
-	}
-
-	return 0;
-}
-#endif /* CONFIG_SHARP_DISPLAY */
-
 static int mdss_mdp_get_pan_intf(const char *pan_intf)
 {
 	int i, rc = MDSS_PANEL_INTF_INVALID;
@@ -2462,17 +2393,10 @@ static int mdss_mdp_get_cmdline_config(struct platform_device *pdev)
 	if (len > 0) {
 		rc = mdss_mdp_get_pan_cfg(pan_cfg);
 		if (!rc) {
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00022 */
-			mdss_mdp_get_info(mdata, &pan_cfg->arg_cfg[0]);
-#endif /* CONFIG_SHARP_DISPLAY */
 			pan_cfg->init_done = true;
 			return rc;
 		}
 	}
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00022 */
-	mdss_mdp_get_info(mdata, &pan_cfg->arg_cfg[0]);
-#endif /* CONFIG_SHARP_DISPLAY */
 
 	rc = mdss_mdp_parse_dt_pan_intf(pdev);
 	/* if pref pan intf is not present */
@@ -2899,13 +2823,7 @@ static int mdss_mdp_probe(struct platform_device *pdev)
 
 	mdss_mdp_hw.irq_info->irq = res->start;
 	mdss_mdp_hw.ptr = mdata;
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_0006 */
-	rc = mdss_set_lcd_status(pdev);
-	if (rc) {
-		pr_err("Error get lcd status:rc=[%d]\n", rc);
-		goto probe_done;
-	}
-#endif /* CONFIG_SHARP_DISPLAY */
+
 	/* export misc. interrupts to external driver */
 	mdata->irq_domain = irq_domain_add_linear(pdev->dev.of_node, 32,
 			&mdss_irq_domain_ops, mdata);
@@ -2940,21 +2858,12 @@ static int mdss_mdp_probe(struct platform_device *pdev)
 	if (!pm_runtime_enabled(&pdev->dev))
 		mdss_mdp_footswitch_ctrl(mdata, true);
 
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_0006 */
-	if (mdata->upper_unit_is_connected == MDSS_UPPER_UNIT_IS_CONNECTED) {
-		rc = mdss_mdp_bus_scale_register(mdata);
-		if (rc) {
-			pr_err("unable to register bus scaling\n");
-			goto probe_done;
-		}
-	}
-#else /* CONFIG_SHARP_DISPLAY */
 	rc = mdss_mdp_bus_scale_register(mdata);
 	if (rc) {
 		pr_err("unable to register bus scaling\n");
 		goto probe_done;
 	}
-#endif /* CONFIG_SHARP_DISPLAY */
+
 	/*
 	 * enable clocks and read mdp_rev as soon as possible once
 	 * kernel is up.
@@ -4739,7 +4648,7 @@ struct mdss_panel_cfg *mdss_panel_intf_type(int intf_val)
 }
 EXPORT_SYMBOL(mdss_panel_intf_type);
 
-struct irq_info *mdss_intr_line()
+struct irq_info *mdss_intr_line(void)
 {
 	return mdss_mdp_hw.irq_info;
 }
@@ -5329,32 +5238,6 @@ static const struct dev_pm_ops mdss_mdp_pm_ops = {
 			mdss_mdp_runtime_idle)
 #endif
 };
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_0006 */
-int mdss_set_lcd_status(struct platform_device *pdev)
-{
-	struct mdss_data_type *mdata;
-	sharp_smem_common_type *sh_smem = NULL;
-	unsigned char val_upper = 0;
-
-	mdata = mdss_mdp_get_mdata();
-	mdata->upper_unit_is_connected = MDSS_UPPER_UNIT_IS_CONNECTED;
-
-	sh_smem = (sharp_smem_common_type *)sh_smem_get_common_address();
-	if (sh_smem == NULL) {
-		pr_err("get smem address is NULL\n");
-		return -EINVAL;
-	}
-
-	val_upper = sh_smem->shdiag_upperunit;
-
-	if (!val_upper) {
-		mdata->upper_unit_is_connected = MDSS_UPPER_UNIT_IS_NOT_CONNECTED;
-	}
-	pr_debug("check_upper_unit connected=%d\n", mdata->upper_unit_is_connected);
-
-	return 0;
-}
-#endif /* CONFIG_SHARP_DISPLAY */
 
 static int mdss_mdp_remove(struct platform_device *pdev)
 {

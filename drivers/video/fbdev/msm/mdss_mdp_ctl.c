@@ -2456,9 +2456,6 @@ struct mdss_mdp_ctl *mdss_mdp_ctl_alloc(struct mdss_data_type *mdata,
 			spin_lock_init(&ctl->spin_lock);
 			BLOCKING_INIT_NOTIFIER_HEAD(&ctl->notifier_head);
 			pr_debug("alloc ctl_num=%d\n", ctl->num);
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00019 */
-			mutex_init(&ctl->mipiclk_lock);
-#endif /* CONFIG_SHARP_DISPLAY */
 			break;
 		}
 		ctl = NULL;
@@ -6128,98 +6125,3 @@ void mdss_mdp_wb_free(struct mdss_mdp_writeback *wb)
 			&mdata->wb_lock))
 		mutex_unlock(&mdata->wb_lock);
 }
-
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00019 */
-static void mdss_mdp_mipiclk_param_log(struct mdp_mipi_clkchg_param *mdp_mipi_clkchg_param)
-{
-	pr_debug("[%s]param->host.clock_rate         = %10d\n"  , __func__, mdp_mipi_clkchg_param->host.clock_rate          );
-	pr_debug("[%s]param->host.display_width      = %10d\n"  , __func__, mdp_mipi_clkchg_param->host.display_width       );
-	pr_debug("[%s]param->host.display_height     = %10d\n"  , __func__, mdp_mipi_clkchg_param->host.display_height      );
-	pr_debug("[%s]param->host.hsync_pulse_width  = %10d\n"  , __func__, mdp_mipi_clkchg_param->host.hsync_pulse_width   );
-	pr_debug("[%s]param->host.h_back_porch       = %10d\n"  , __func__, mdp_mipi_clkchg_param->host.h_back_porch        );
-	pr_debug("[%s]param->host.h_front_porch      = %10d\n"  , __func__, mdp_mipi_clkchg_param->host.h_front_porch       );
-	pr_debug("[%s]param->host.vsync_pulse_width  = %10d\n"  , __func__, mdp_mipi_clkchg_param->host.vsync_pulse_width   );
-	pr_debug("[%s]param->host.v_back_porch       = %10d\n"  , __func__, mdp_mipi_clkchg_param->host.v_back_porch        );
-	pr_debug("[%s]param->host.v_front_porch      = %10d\n"  , __func__, mdp_mipi_clkchg_param->host.v_front_porch       );
-	pr_debug("[%s]param->host.t_clk_post         = 0x%02X\n", __func__, mdp_mipi_clkchg_param->host.t_clk_post          );
-	pr_debug("[%s]param->host.t_clk_pre          = 0x%02X\n", __func__, mdp_mipi_clkchg_param->host.t_clk_pre           );
-	pr_debug("[%s]param->host.timing_ctrl[ 0]    = 0x%02X\n", __func__, mdp_mipi_clkchg_param->host.timing_ctrl[ 0]     );
-	pr_debug("[%s]param->host.timing_ctrl[ 1]    = 0x%02X\n", __func__, mdp_mipi_clkchg_param->host.timing_ctrl[ 1]     );
-	pr_debug("[%s]param->host.timing_ctrl[ 2]    = 0x%02X\n", __func__, mdp_mipi_clkchg_param->host.timing_ctrl[ 2]     );
-	pr_debug("[%s]param->host.timing_ctrl[ 3]    = 0x%02X\n", __func__, mdp_mipi_clkchg_param->host.timing_ctrl[ 3]     );
-	pr_debug("[%s]param->host.timing_ctrl[ 4]    = 0x%02X\n", __func__, mdp_mipi_clkchg_param->host.timing_ctrl[ 4]     );
-	pr_debug("[%s]param->host.timing_ctrl[ 5]    = 0x%02X\n", __func__, mdp_mipi_clkchg_param->host.timing_ctrl[ 5]     );
-	pr_debug("[%s]param->host.timing_ctrl[ 6]    = 0x%02X\n", __func__, mdp_mipi_clkchg_param->host.timing_ctrl[ 6]     );
-	pr_debug("[%s]param->host.timing_ctrl[ 7]    = 0x%02X\n", __func__, mdp_mipi_clkchg_param->host.timing_ctrl[ 7]     );
-	pr_debug("[%s]param->host.timing_ctrl[ 8]    = 0x%02X\n", __func__, mdp_mipi_clkchg_param->host.timing_ctrl[ 8]     );
-	pr_debug("[%s]param->host.timing_ctrl[ 9]    = 0x%02X\n", __func__, mdp_mipi_clkchg_param->host.timing_ctrl[ 9]     );
-	pr_debug("[%s]param->host.timing_ctrl[10]    = 0x%02X\n", __func__, mdp_mipi_clkchg_param->host.timing_ctrl[10]     );
-	pr_debug("[%s]param->host.timing_ctrl[11]    = 0x%02X\n", __func__, mdp_mipi_clkchg_param->host.timing_ctrl[11]     );
-
-	pr_debug("[%s]param->internal_osc            = %10d\n"  , __func__, mdp_mipi_clkchg_param->internal_osc             );
-
-	pr_debug("[%s]param->panel.DSI[0]            = 0x%02X\n", __func__, mdp_mipi_clkchg_param->panel.DSI[0]            );
-	pr_debug("[%s]param->panel.DSI[1]            = 0x%02X\n", __func__, mdp_mipi_clkchg_param->panel.DSI[1]            );
-	pr_debug("[%s]param->panel.DSI[2]            = 0x%02X\n", __func__, mdp_mipi_clkchg_param->panel.DSI[2]            );
-	pr_debug("[%s]param->panel.DSI[3]            = 0x%02X\n", __func__, mdp_mipi_clkchg_param->panel.DSI[3]            );
-	pr_debug("[%s]param->panel.DSI[4]            = 0x%02X\n", __func__, mdp_mipi_clkchg_param->panel.DSI[4]            );
-	pr_debug("[%s]param->panel.OSC[0]            = 0x%02X\n", __func__, mdp_mipi_clkchg_param->panel.OSC[0]            );
-	pr_debug("[%s]param->panel.OSC[1]            = 0x%02X\n", __func__, mdp_mipi_clkchg_param->panel.OSC[1]            );
-	pr_debug("[%s]param->panel.OSC[2]            = 0x%02X\n", __func__, mdp_mipi_clkchg_param->panel.OSC[2]            );
-	pr_debug("[%s]param->panel.OSC[3]            = 0x%02X\n", __func__, mdp_mipi_clkchg_param->panel.OSC[3]            );
-	pr_debug("[%s]param->panel.OSC[4]            = 0x%02X\n", __func__, mdp_mipi_clkchg_param->panel.OSC[4]            );
-	pr_debug("[%s]param->panel.OSC[5]            = 0x%02X\n", __func__, mdp_mipi_clkchg_param->panel.OSC[5]            );
-	pr_debug("[%s]param->panel.OSC[6]            = 0x%02X\n", __func__, mdp_mipi_clkchg_param->panel.OSC[6]            );
-	pr_debug("[%s]param->panel.OSC[7]            = 0x%02X\n", __func__, mdp_mipi_clkchg_param->panel.OSC[7]            );
-	pr_debug("[%s]param->panel.OSC[8]            = 0x%02X\n", __func__, mdp_mipi_clkchg_param->panel.OSC[8]            );
-	pr_debug("[%s]param->panel.OSC[9]            = 0x%02X\n", __func__, mdp_mipi_clkchg_param->panel.OSC[9]            );
-
-	return;
-}
-
-int mdss_mdp_ctl_update_mipiclk(struct mdss_mdp_ctl *ctl)
-{
-	struct mdss_panel_info *pinfo;
-	struct mdss_overlay_private *mdp5_data = NULL;
-	int ret = 0;
-	struct mdp_mipi_clkchg_param request_mipiclk;
-
-	if (!ctl->mipiclk_pending) {
-		goto exit;
-	}
-
-	pinfo = &ctl->panel_data->panel_info;
-	if (!pinfo) {
-		ret = -ENODEV;
-		goto exit;
-	}
-
-	if (!ctl->ops.config_mipiclk_fnc)
-		goto exit;
-
-	if (ctl->mfd)
-		mdp5_data = mfd_to_mdp5_data(ctl->mfd);
-
-	if (!mdp5_data) {
-		ret = -ENODEV;
-		goto exit;
-	}
-	mutex_lock(&mdp5_data->dfps_lock);
-	mutex_lock(&ctl->mipiclk_lock);
-	memcpy(&request_mipiclk, &ctl->request_mipiclk
-		, sizeof(request_mipiclk));
-	ctl->mipiclk_pending = false;
-	mutex_unlock(&ctl->mipiclk_lock);
-
-	mdss_mdp_mipiclk_param_log(&request_mipiclk);
-	ATRACE_BEGIN("config_mipiclk_fnc");
-	ret = ctl->ops.config_mipiclk_fnc(ctl, &request_mipiclk);
-	if (ret) {
-		pr_err("Failed to change clk. rc = %d\n", ret);
-	}
-	ATRACE_END("config_mipiclk_fnc");
-	mutex_unlock(&mdp5_data->dfps_lock);
-exit:
-	return ret;
-}
-#endif /* CONFIG_SHARP_DISPLAY */

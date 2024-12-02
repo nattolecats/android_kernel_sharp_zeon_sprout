@@ -63,7 +63,6 @@ struct step_chg_info {
 	ktime_t			jeita_last_update_time;
 	bool			step_chg_enable;
 	bool			sw_jeita_enable;
-    bool            jeita_arb_en;
 	bool			config_is_read;
 	bool			step_chg_cfg_valid;
 	bool			sw_jeita_cfg_valid;
@@ -587,7 +586,7 @@ static int handle_jeita(struct step_chg_info *chip)
 	 * Suspend USB input path if battery voltage is above
 	 * JEITA VFLOAT threshold.
 	 */
-	if (chip->jeita_arb_en && fv_uv > 0) {
+	if (fv_uv > 0) {
 		rc = power_supply_get_property(chip->batt_psy,
 				POWER_SUPPLY_PROP_VOLTAGE_NOW, &pval);
 		if (!rc && (pval.intval > fv_uv))
@@ -739,7 +738,7 @@ static int step_chg_register_notifier(struct step_chg_info *chip)
 }
 
 int qcom_step_chg_init(struct device *dev,
-		bool step_chg_enable, bool sw_jeita_enable, bool jeita_arb_en)
+		bool step_chg_enable, bool sw_jeita_enable)
 {
 	int rc;
 	struct step_chg_info *chip;
@@ -760,7 +759,6 @@ int qcom_step_chg_init(struct device *dev,
 	chip->dev = dev;
 	chip->step_chg_enable = step_chg_enable;
 	chip->sw_jeita_enable = sw_jeita_enable;
-    chip->jeita_arb_en = jeita_arb_en;
 	chip->step_index = -EINVAL;
 	chip->jeita_fcc_index = -EINVAL;
 	chip->jeita_fv_index = -EINVAL;

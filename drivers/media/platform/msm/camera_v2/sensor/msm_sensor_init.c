@@ -20,19 +20,7 @@
 
 /* Logging macro */
 #undef CDBG
-/* SHLOCAL_CAMERA_DRIVERS-> */
-#if 0
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
-#else
-#define CONFIG_MSMB_CAMERA_DEBUG_SH
-#undef CDBG
-#ifdef CONFIG_MSMB_CAMERA_DEBUG_SH
-#define CDBG(fmt, args...) pr_err(fmt, ##args)
-#else
-#define CDBG(fmt, args...) do { } while (0)
-#endif
-#endif
-/* SHLOCAL_CAMERA_DRIVERS<- */
 
 static struct msm_sensor_init_t *s_init;
 static struct v4l2_file_operations msm_sensor_init_v4l2_subdev_fops;

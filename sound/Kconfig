@@ -124,20 +124,6 @@ endif # SOUND_PRIME
 
 endif # !M68K
 
-#
-# audio device configuration
-#
-
-menu "SHARP audio driver"
-
-comment "SHARP audio drivers"
-
-config SH_AUDIO_DRIVER
-	tristate "SHARP Audio Driver customized"
-	default y
-
-endmenu
-
 endif # SOUND
 
 # AC97_BUS is used from both sound and ucb1400

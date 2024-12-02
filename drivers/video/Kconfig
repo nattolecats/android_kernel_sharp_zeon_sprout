@@ -47,10 +47,5 @@ if FB || SGI_NEWPORT_CONSOLE
 
 endif
 
-config SHARP_DISPLAY
-	bool "SHARP DRM DRIVER"
-	default n
-	help
-	  Choose this option if SHARP_CUSTOMIZE support is needed in DRM/KMS driver.
 
 endmenu

@@ -270,6 +270,9 @@ int usb_func_wakeup(struct usb_function *func);
 
 int usb_get_func_interface_id(struct usb_function *func);
 
+int config_ep_by_speed_and_alt(struct usb_gadget *g, struct usb_function *f,
+				struct usb_ep *_ep, u8 alt);
+
 int config_ep_by_speed(struct usb_gadget *g, struct usb_function *f,
 			struct usb_ep *_ep);
 
@@ -518,11 +521,6 @@ struct usb_composite_dev {
 	struct usb_composite_driver	*driver;
 	u8				next_string_id;
 	char				*def_manufacturer;
-/* 2016.11.11 USB ADD START */
-#ifdef CONFIG_USB_ANDROID_SHARP_MTP
-	int count;
-#endif /* CONFIG_USB_ANDROID_SHARP_MTP */
-/* 2015.11.11 USB ADD END */
 
 	/* the gadget driver won't enable the data pullup
 	 * while the deactivation count is nonzero.

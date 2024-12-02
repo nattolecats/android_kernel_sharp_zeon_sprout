@@ -237,9 +237,6 @@ static struct qpnp_vadc_scale_fn vadc_scale_fn[] = {
 	[SCALE_BATT_THERM_TEMP_PU30] = {qpnp_adc_batt_therm_pu30},
 	[SCALE_BATT_THERM_TEMP_PU400] = {qpnp_adc_batt_therm_pu400},
 	[SCALE_BATT_THERM_TEMP_QRD_215] = {qpnp_adc_batt_therm_qrd_215}
-#ifdef CONFIG_BATTERY_SHARP
-	,[SCALE_BATT_THERM_TEMP_PU100_B4250] = {qpnp_adc_batt_therm_pu100_b4250}
-#endif /* CONFIG_BATTERY_SHARP */
 };
 
 static struct qpnp_vadc_rscale_fn adc_vadc_rscale_fn[] = {
@@ -404,7 +401,7 @@ static int qpnp_vadc_hc_check_conversion_status(struct qpnp_vadc_chip *vadc,
 static int qpnp_vadc_hc_read_data(struct qpnp_vadc_chip *vadc, int *data)
 {
 	int rc = 0;
-	u8 rslt_lsb = 0, rslt_msb = 0, chno = 0;
+	u8 rslt_lsb = 0, rslt_msb = 0;
 
 	rc = qpnp_vadc_read_reg(vadc, QPNP_VADC_HC1_DATA0, &rslt_lsb, 1);
 	if (rc < 0) {
@@ -417,14 +414,6 @@ static int qpnp_vadc_hc_read_data(struct qpnp_vadc_chip *vadc, int *data)
 		pr_err("qpnp adc result read failed for data1\n");
 		return rc;
 	}
-
-	rc = qpnp_vadc_read_reg(vadc, QPNP_VADC_HC1_ADC_CH_SEL_CTL, &chno, 1);
-	if (rc < 0) {
-		pr_err("qpnp adc configure block read failed\n");
-		return rc;
-	}
-
-	pr_debug("adc channel just after reading result: 0x%x\n", chno);
 
 	*data = (rslt_msb << 8) | rslt_lsb;
 
@@ -529,7 +518,7 @@ static int qpnp_vadc_hc_pre_configure_usb_in(struct qpnp_vadc_chip *vadc,
 						int dt_index)
 {
 	int rc = 0;
-	u8 buf, chno = 0;
+	u8 buf;
 	u8 dig_param = 0;
 	struct qpnp_adc_amux_properties conv;
 	bool channel_check = false;
@@ -597,33 +586,6 @@ static int qpnp_vadc_hc_pre_configure_usb_in(struct qpnp_vadc_chip *vadc,
 			return rc;
 	}
 
-	rc = qpnp_vadc_read_reg(vadc, QPNP_VADC_HC1_ADC_CH_SEL_CTL, &chno, 1);
-	if (rc < 0) {
-		pr_err("Channel reread failed\n");
-		return rc;
-	}
-
-	if (buf != chno) {
-		pr_debug("qpnp adc register configure failed once, value written: 0x%x real value:0x%x\n",chno,buf);
-
-		rc = qpnp_vadc_write_reg(vadc, QPNP_VADC_HC1_ADC_CH_SEL_CTL, &buf, 1);
-		if (rc < 0) {
-			pr_err("qpnp adc register configure failed\n");
-			return rc;
-		}
-
-		rc = qpnp_vadc_read_reg(vadc, QPNP_VADC_HC1_ADC_CH_SEL_CTL, &chno, 1);
-		if (rc < 0) {
-			pr_err("qpnp adc configure read failed\n");
-			return rc;
-		}
-
-		if (chno != buf) {
-			pr_err("qpnp adc register configure failed twice, value written: 0x%x\n",chno);
-			return -EINVAL;
-		}
-	}
-
 	/* Wait for GND read to complete */
 	rc = qpnp_vadc_wait_for_eoc(vadc);
 	if (rc < 0)
@@ -648,7 +610,6 @@ static int qpnp_vadc_hc_configure(struct qpnp_vadc_chip *vadc,
 	u8 buf[5];
 	u8 conv_req = 0;
 	bool channel_check = false;
-	u8 chno = 0;
 
 	if (vadc->pmic_rev_id)
 		if (vadc->pmic_rev_id->pmic_subtype == PMI632_SUBTYPE)
@@ -688,61 +649,10 @@ static int qpnp_vadc_hc_configure(struct qpnp_vadc_chip *vadc,
 		buf[0], buf[1], buf[2], buf[3]);
 
 	/* Block register write from 0x42 through 0x46 */
-	rc = qpnp_vadc_write_reg(vadc, QPNP_VADC_HC1_ADC_DIG_PARAM, (buf+0), 1);
+	rc = qpnp_vadc_write_reg(vadc, QPNP_VADC_HC1_ADC_DIG_PARAM, buf, 5);
 	if (rc < 0) {
 		pr_err("qpnp adc block register configure failed\n");
 		return rc;
-	}
-
-	rc = qpnp_vadc_write_reg(vadc, QPNP_VADC_HC1_FAST_AVG_CTL, (buf+1), 1);
-	if (rc < 0) {
-		pr_err("qpnp adc block register configure failed\n");
-		return rc;
-	}
-
-	rc = qpnp_vadc_write_reg(vadc, QPNP_VADC_HC1_DELAY_CTL, (buf+3), 1);
-	if (rc < 0) {
-		pr_err("qpnp adc block register configure failed\n");
-		return rc;
-	}
-
-	rc = qpnp_vadc_write_reg(vadc, QPNP_VADC_HC1_EN_CTL1, (buf+4), 1);
-	if (rc < 0) {
-		pr_err("qpnp adc block register configure failed\n");
-		return rc;
-	}
-
-	rc = qpnp_vadc_write_reg(vadc, QPNP_VADC_HC1_ADC_CH_SEL_CTL, (buf+2), 1);
-	if (rc < 0) {
-		pr_err("qpnp adc block register configure failed\n");
-		return rc;
-	}
-
-	rc = qpnp_vadc_read_reg(vadc, QPNP_VADC_HC1_ADC_CH_SEL_CTL, &chno, 1);
-	if (rc < 0) {
-		pr_err("qpnp adc configure block read failed\n");
-		return rc;
-	}
-
-	if (chno != buf[2]) {
-		pr_err("qpnp adc register configure failed once, value written: 0x%x real value:0x%x\n",chno,buf[2]);
-
-		rc = qpnp_vadc_write_reg(vadc, QPNP_VADC_HC1_ADC_CH_SEL_CTL, (buf+2), 1);
-		if (rc < 0) {
-			pr_err("qpnp adc register configure failed\n");
-			return rc;
-		}
-
-		rc = qpnp_vadc_read_reg(vadc, QPNP_VADC_HC1_ADC_CH_SEL_CTL, &chno, 1);
-		if (rc < 0) {
-			pr_err("qpnp adc configure read failed\n");
-			return rc;
-		}
-
-		if (chno != buf[2]) {
-			pr_err("qpnp adc register configure failed twice, value written: 0x%x\n",chno);
-			return -EINVAL;
-		}
 	}
 
 	if (channel_check) {
@@ -773,8 +683,6 @@ int32_t qpnp_vadc_hc_read(struct qpnp_vadc_chip *vadc,
 		return -EPROBE_DEFER;
 
 	mutex_lock(&vadc->adc->adc_lock);
-
-	pr_debug("%s Enter lock for channel:0x%x\n",__func__,channel);
 
 	while ((vadc->adc->adc_channels[dt_index].channel_num
 		!= channel) && (dt_index < vadc->max_channels_available))
@@ -879,7 +787,6 @@ int32_t qpnp_vadc_hc_read(struct qpnp_vadc_chip *vadc,
 			channel, result->adc_code, result->physical);
 
 fail_unlock:
-	pr_debug("%s Exiting lock for channel:0x%x\n",__func__,channel);
 	mutex_unlock(&vadc->adc->adc_lock);
 
 	return rc;

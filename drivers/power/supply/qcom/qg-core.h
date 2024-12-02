@@ -22,9 +22,6 @@ struct qg_batt_props {
 	int			vbatt_full_mv;
 	int			fastchg_curr_ma;
 	int			qg_profile_version;
-#ifdef CONFIG_BATTERY_SHARP
-	int			nom_batt_cap_mah;
-#endif /* CONFIG_BATTERY_SHARP */
 };
 
 struct qg_irq_info {
@@ -102,10 +99,6 @@ struct qpnp_qg {
 	struct votable		*fifo_irq_disable_votable;
 	struct votable		*good_ocv_irq_disable_votable;
 	u32			qg_base;
-#ifdef CONFIG_BATTERY_SHARP
-	struct mutex		current_avg_lock;
-	int64_t		current_avg;
-#endif /* CONFIG_BATTERY_SHARP */
 
 	/* local data variables */
 	u32			batt_id_ohm;

@@ -9,6 +9,7 @@ menu "Serial drivers"
 
 config SERIAL_EARLYCON
 	bool
+	depends on SERIAL_CORE
 	help
 	  Support for early consoles with the earlycon parameter. This enables
 	  the console before standard serial driver is probed. The console is
@@ -1699,10 +1700,6 @@ config SERIAL_MSM_SMD
 	  to communicate over smd via device nodes. This enable the
 	  usersapce clients to read and write to some streaming SMD ports
 	  via tty device interface for MSM chipset.
-
-config SHARP_SERIAL_EXPAND_DEBUG_FUNCTION
-	bool "SERIAL customize expand debug function"
-	default y
 
 endmenu
 

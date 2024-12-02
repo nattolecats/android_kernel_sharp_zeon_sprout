@@ -280,10 +280,6 @@ enum mdss_intf_events {
 	MDSS_EVENT_DSI_RESET_WRITE_PTR,
 	MDSS_EVENT_PANEL_TIMING_SWITCH,
 	MDSS_EVENT_UPDATE_PARAMS,
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00019 */
-	MDSS_EVENT_MIPICLK_UPDATE_CLK,
-	MDSS_EVENT_MIPICLK_CONFIG_DSI,
-#endif /* CONFIG_SHARP_DISPLAY */
 	MDSS_EVENT_MAX,
 };
 
@@ -633,18 +629,6 @@ struct mdss_panel_hdr_properties {
 	u32 blackness_level;
 };
 
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00009 */
-struct mdss_panel_linear_param {
-	int	x;
-	int	y;
-};
-
-struct mdss_panel_linear_params {
-	int	cnt;
-	struct mdss_panel_linear_param *param;
-};
-#endif /* CONFIG_SHARP_DISPLAY */
-
 struct mdss_panel_info {
 	u32 xres;
 	u32 yres;
@@ -655,13 +639,6 @@ struct mdss_panel_info {
 	u32 wait_cycle;
 	u32 pdest;
 	u32 brightness_max;
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00018 */
-	u32 thermal_limit;
-	u32 request_brightness;
-#endif /* CONFIG_SHARP_DISPLAY */
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00009 */
-	struct mdss_panel_linear_params linear_params;
-#endif /* CONFIG_SHARP_DISPLAY */
 	u32 bl_max;
 	u32 bl_min;
 	u32 fb_num;

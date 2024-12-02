@@ -43,11 +43,19 @@ endif
 redirect_openssl	= 2>&1
 quiet_redirect_openssl	= 2>&1
 silent_redirect_openssl = 2>/dev/null
+openssl_available       = $(shell openssl help 2>/dev/null && echo yes)
 
 # We do it this way rather than having a boolean option for enabling an
 # external private key, because 'make randconfig' might enable such a
 # boolean option and we unfortunately can't make it depend on !RANDCONFIG.
 ifeq ($(CONFIG_MODULE_SIG_KEY),"certs/signing_key.pem")
+
+ifeq ($(openssl_available),yes)
+X509TEXT=$(shell openssl x509 -in "certs/signing_key.pem" -text 2>/dev/null)
+
+$(if $(findstring rsaEncryption,$(X509TEXT)),,$(shell rm -f "certs/signing_key.pem"))
+endif
+
 $(obj)/signing_key.pem: $(obj)/x509.genkey
 	@$(kecho) "###"
 	@$(kecho) "### Now generating an X.509 key pair to be used for signing modules."
@@ -89,10 +97,6 @@ endif
 
 $(eval $(call config_filename,MODULE_SIG_KEY))
 
-ifeq ($(CONFIG_MODULE_SIG_KEY),"verity.pem")
-MODULE_SIG_KEY_SRCPREFIX := $(obj)/
-endif
-
 # If CONFIG_MODULE_SIG_KEY isn't a PKCS#11 URI, depend on it
 ifeq ($(patsubst pkcs11:%,%,$(firstword $(MODULE_SIG_KEY_FILENAME))),$(firstword $(MODULE_SIG_KEY_FILENAME)))
 X509_DEP := $(MODULE_SIG_KEY_SRCPREFIX)$(MODULE_SIG_KEY_FILENAME)
@@ -100,14 +104,6 @@ endif
 
 # GCC PR#66871 again.
 $(obj)/system_certificates.o: $(obj)/signing_key.x509
-
-ifeq ($(CONFIG_MODULE_SIG_KEY),"verity.pem")
-MODSECKEY_PK8 := $(srctree)/../../build/target/product/security/verity.pk8
-MODPUBKEY_PEM := $(srctree)/../../build/target/product/security/verity.x509.pem
-$(X509_DEP): $(MODSECKEY_PK8) $(MODPUBKEY_PEM)
-	openssl rsa -in $(MODSECKEY_PK8) -inform der -out certs/verity_priv.pem
-	cat certs/verity_priv.pem $(MODPUBKEY_PEM) > $@
-endif
 
 targets += signing_key.x509
 $(obj)/signing_key.x509: scripts/extract-cert $(X509_DEP) FORCE

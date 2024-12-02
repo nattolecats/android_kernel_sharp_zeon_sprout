@@ -148,11 +148,6 @@ config USB_USS720
 	  To compile this driver as a module, choose M here: the
 	  module will be called uss720.
 
-# 20161111 USB SHARP CUSTOMIZE ADD START
-config USB_DEBUG_SHARP_LOG
-	bool "Sharp customize debug messages"
-	default n
-# 20161111 USB SHARP CUSTOMIZE ADD END
 source "drivers/usb/serial/Kconfig"
 
 source "drivers/usb/misc/Kconfig"
@@ -167,8 +162,7 @@ source "drivers/usb/gadget/Kconfig"
 
 config USB_LED_TRIG
 	bool "USB LED Triggers"
-	depends on LEDS_CLASS && LEDS_TRIGGERS
-	select USB_COMMON
+	depends on LEDS_CLASS && USB_COMMON && LEDS_TRIGGERS
 	help
 	  This option adds LED triggers for USB host and/or gadget activity.
 

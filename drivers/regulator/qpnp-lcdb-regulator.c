@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1019,7 +1019,9 @@ static irqreturn_t qpnp_lcdb_sc_irq_handler(int irq, void *data)
 	int rc;
 	u8 val, val2[2] = {0};
 
+	mutex_lock(&lcdb->lcdb_mutex);
 	rc = qpnp_lcdb_read(lcdb, lcdb->base + INT_RT_STATUS_REG, &val, 1);
+	mutex_unlock(&lcdb->lcdb_mutex);
 	if (rc < 0)
 		goto irq_handled;
 
@@ -1059,8 +1061,15 @@ static irqreturn_t qpnp_lcdb_sc_irq_handler(int irq, void *data)
 			/* blanking time */
 			usleep_range(2000, 2100);
 			/* Read the SC status again to confirm true SC */
+			mutex_lock(&lcdb->lcdb_mutex);
+			/*
+			 * Wait for the completion of LCDB module enable,
+			 * which could be initiated in a previous SC event,
+			 * to avoid multiple module disable/enable calls.
+			 */
 			rc = qpnp_lcdb_read(lcdb,
 				lcdb->base + INT_RT_STATUS_REG, &val, 1);
+			mutex_unlock(&lcdb->lcdb_mutex);
 			if (rc < 0)
 				goto irq_handled;
 
@@ -2306,9 +2315,6 @@ static int qpnp_lcdb_regulator_probe(struct platform_device *pdev)
 	int rc;
 	struct device_node *node;
 	struct qpnp_lcdb *lcdb;
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00002 */
-	u8 val;
-#endif /* CONFIG_SHARP_DISPLAY */
 
 	node = pdev->dev.of_node;
 	if (!node) {
@@ -2361,16 +2367,6 @@ static int qpnp_lcdb_regulator_probe(struct platform_device *pdev)
 			lcdb->lcdb_enabled, lcdb->ldo.voltage_mv,
 			lcdb->ncp.voltage_mv, lcdb->bst.voltage_mv);
 
-#ifdef CONFIG_SHARP_DISPLAY /* CUST_ID_00002 */
-	val = 0x0F;
-	pr_debug("%s :write vsp-vsn wait time val(0x%02x)\n",__func__, val);
-	rc = qpnp_lcdb_secure_write(lcdb, lcdb->base + LCDB_PWRUP_PWRDN_CTL_REG,
-							val);
-	if (rc < 0) {
-		pr_err("Failed to set PWRUP_PWRDN_CTL rc=%d\n", rc);
-		return rc;
-	}
-#endif /* CONFIG_SHARP_DISPLAY */
 	return rc;
 }
 

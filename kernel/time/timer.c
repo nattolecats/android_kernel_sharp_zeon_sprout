@@ -42,6 +42,7 @@
 #include <linux/sched/sysctl.h>
 #include <linux/slab.h>
 #include <linux/compat.h>
+#include <linux/random.h>
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -53,18 +54,6 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/timer.h>
-
-#ifdef CONFIG_SHARP_PNP_SLEEP_DEBUG
-#include <linux/module.h>
-enum {
-	SH_DEBUG_SCHEDULE_TIMEOUT_EXPIRED = 1U << 0,
-	SH_DEBUG_SCHEDULE_TIMEOUT_STARTED = 1U << 1,
-};
-static int sh_debug_mask = 0;
-module_param_named(
-	sh_debug_mask, sh_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP
-);
-#endif /* CONFIG_SHARP_PNP_SLEEP_DEBUG */
 
 __visible u64 jiffies_64 __cacheline_aligned_in_smp = INITIAL_JIFFIES;
 
@@ -526,8 +515,8 @@ static int calc_wheel_index(unsigned long expires, unsigned long clk)
 		 * Force expire obscene large timeouts to expire at the
 		 * capacity limit of the wheel.
 		 */
-		if (expires >= WHEEL_TIMEOUT_CUTOFF)
-			expires = WHEEL_TIMEOUT_MAX;
+		if (delta >= WHEEL_TIMEOUT_CUTOFF)
+			expires = clk + WHEEL_TIMEOUT_MAX;
 
 		idx = calc_index(expires, LVL_DEPTH - 1);
 	}
@@ -1753,11 +1742,6 @@ SYSCALL_DEFINE1(alarm, unsigned int, seconds)
 
 static void process_timeout(unsigned long __data)
 {
-#ifdef CONFIG_SHARP_PNP_SLEEP_DEBUG
-	if ((sh_debug_mask & SH_DEBUG_SCHEDULE_TIMEOUT_EXPIRED) && (__data))
-		pr_info("%s: name %s, pid %d\n",
-			__func__, ((struct task_struct *)__data)->comm, ((struct task_struct *)__data)->pid);
-#endif /* CONFIG_SHARP_PNP_SLEEP_DEBUG */
 	wake_up_process((struct task_struct *)__data);
 }
 
@@ -1822,13 +1806,6 @@ signed long __sched schedule_timeout(signed long timeout)
 	}
 
 	expire = timeout + jiffies;
-
-#ifdef CONFIG_SHARP_PNP_SLEEP_DEBUG
-	if (sh_debug_mask & SH_DEBUG_SCHEDULE_TIMEOUT_STARTED)
-		pr_info("%s: name %s, pid %d, time left %u (ms)\n",
-			__func__, current->comm, current->pid,
-			jiffies_to_msecs(timeout));
-#endif /* CONFIG_SHARP_PNP_SLEEP_DEBUG */
 
 	setup_timer_on_stack(&timer, process_timeout, (unsigned long)current);
 	__mod_timer(&timer, expire, false);

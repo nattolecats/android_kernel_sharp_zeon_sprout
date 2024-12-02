@@ -44,10 +44,6 @@
 
 #include "irq-gic-common.h"
 
-#ifdef CONFIG_SHARP_PNP_SLEEP_SLEEPLOG
-#include <soc/qcom/sharp/sh_sleeplog.h>
-#endif /* CONFIG_SHARP_PNP_SLEEP_SLEEPLOG */
-
 #define MAX_IRQ			1020U	/* Max number of SGI+PPI+SPI */
 #define SPI_START_IRQ		32	/* SPI start irq number */
 #define GICD_ICFGR_BITS		2	/* 2 bits per irq in GICD_ICFGR */
@@ -713,10 +709,8 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 	u32 pending[32];
 	void __iomem *base = gic_data.dist_base;
 
-#ifndef CONFIG_SHARP_PNP_SLEEP_DEBUG
 	if (!msm_show_resume_irq_mask)
 		return;
-#endif /* CONFIG_SHARP_PNP_SLEEP_DEBUG */
 
 	for (i = 0; i * 32 < gic->irq_nr; i++) {
 		enabled = readl_relaxed(base + GICD_ICENABLER + i * 4);
@@ -736,16 +730,7 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 		else if (desc->action && desc->action->name)
 			name = desc->action->name;
 
-#ifdef CONFIG_SHARP_PNP_SLEEP_SLEEPLOG
-		sh_count_gic_counter(irq);
-#endif /* CONFIG_SHARP_PNP_SLEEP_SLEEPLOG */
-
-#ifdef CONFIG_SHARP_PNP_SLEEP_DEBUG
-		if (msm_show_resume_irq_mask)
-			pr_warning("%s: %d triggered", __func__, irq);
-#else /* CONFIG_SHARP_PNP_SLEEP_DEBUG */
 		pr_warn("%s: %d triggered %s\n", __func__, irq, name);
-#endif /* CONFIG_SHARP_PNP_SLEEP_DEBUG */
 	}
 }
 
@@ -1430,7 +1415,7 @@ static int get_cpu_number(struct device_node *dn)
 {
 	const __be32 *cell;
 	u64 hwid;
-	int i;
+	int cpu;
 
 	cell = of_get_property(dn, "reg", NULL);
 	if (!cell)
@@ -1444,9 +1429,9 @@ static int get_cpu_number(struct device_node *dn)
 	if (hwid & ~MPIDR_HWID_BITMASK)
 		return -1;
 
-	for (i = 0; i < num_possible_cpus(); i++)
-		if (cpu_logical_map(i) == hwid)
-			return i;
+	for_each_possible_cpu(cpu)
+		if (cpu_logical_map(cpu) == hwid)
+			return cpu;
 
 	return -1;
 }

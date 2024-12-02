@@ -44,10 +44,6 @@
 #include <soc/qcom/subsystem_restart.h>
 #include <soc/qcom/subsystem_notif.h>
 
-/* [WLAN][SHARP] 2014.02.27 Correspondence that can not be the WLAN device Off Start */
-#include <soc/qcom/sharp/sh_boot_manager.h>
-/* [WLAN][SHARP] 2014.02.27 Correspondence that can not be the WLAN device Off  End  */
-
 #include <soc/qcom/smd.h>
 
 #define DEVICE "wcnss_wlan"
@@ -244,15 +240,6 @@ static DEFINE_SPINLOCK(reg_spinlock);
 
 #define FW_CALDATA_CAPABLE() \
 	((penv->fw_major >= 1) && (penv->fw_minor >= 5) ? 1 : 0)
-
-/* [WLAN][SHARP] 2015.05.08 Change default SSID of Wi-Fi tethering Start */
-#include <soc/qcom/sh_smem.h>
-
-static char *wlanmac_from_smem = NULL;
-static char wlanmac_from_smem_buf[18];
-module_param(wlanmac_from_smem, charp, S_IRUGO);
-MODULE_PARM_DESC(wlanmac_from_smem, "store the wlan mac");
-/* [WLAN][SHARP] 2015.05.08 Change default SSID of Wi-Fi tethering End */
 
 static int wcnss_pinctrl_set_state(bool active);
 
@@ -458,10 +445,6 @@ static struct {
 	struct delayed_work wcnss_pm_qos_del_req;
 	/* power manager QOS lock */
 	struct mutex pm_qos_mutex;
-/* [WLAN][SHARP] 2014.02.27 Correspondence that can not be the WLAN device Off Start */
-	int boot_mode;
-	struct wakeup_source wcnss_dev_wake_lock;
-/* [WLAN][SHARP] 2014.02.27 Correspondence that can not be the WLAN device Off  End  */
 	struct clk *snoc_wcnss;
 	unsigned int snoc_wcnss_clock_freq;
 	bool is_dual_band_disabled;
@@ -469,13 +452,6 @@ static struct {
 	struct class *node_class;
 	struct cdev ctrl_dev, node_dev;
 } *penv = NULL;
-
-/* [WLAN][SHARP-EXT] 2016.2.18 Add "For NV reload" Start */
-#define WCNSS_RESET_FLAG_READY					0x00000001
-#define WCNSS_RESET_FLAG_IN_PROGRESS			0x00000002
-#define WCNSS_RESET_FLAG_RESET_OK			0x00000004
-static unsigned int wcnss_reset_flags = 0;
-/* [WLAN][SHARP-EXT] 2016.2.18 Add "For NV reload" End */
 
 static void *wcnss_ipc_log;
 
@@ -2346,11 +2322,6 @@ static void wcnss_process_smd_msg(int len)
 
 	case WCNSS_NVBIN_DNLD_RSP:
 		penv->nv_downloaded = true;
-/* [WLAN][SHARP-EXT] 2016.03.02 Add "For NV reload" Start */
-		if(wcnss_reset_flags & WCNSS_RESET_FLAG_IN_PROGRESS){
-			wcnss_reset_flags |= WCNSS_RESET_FLAG_RESET_OK;
-		}
-/* [WLAN][SHARP-EXT] 2016.03.02 Add "For NV reload" End */
 		fw_status = wcnss_fw_status();
 		wcnss_log(DBG, "received WCNSS_NVBIN_DNLD_RSP from ccpu %u\n",
 			 fw_status);
@@ -3185,10 +3156,6 @@ wcnss_trigger_config(struct platform_device *pdev)
 		}
 	}
 
-/* [WLAN][SHARP-EXT] 2016.2.18 Add "For NV reload" Start */
-	wcnss_reset_flags |= WCNSS_RESET_FLAG_READY;
-/* [WLAN][SHARP-EXT] 2016.2.18 Add "For NV reload" End */
-
 	do {
 		/* trigger initialization of the WCNSS */
 		penv->pil = subsystem_get(WCNSS_PIL_DEVICE);
@@ -3468,13 +3435,6 @@ static int wcnss_notif_cb(struct notifier_block *this, unsigned long code,
 
 	if (code == SUBSYS_PROXY_VOTE) {
 		if (pdev && pwlanconfig) {
-/* [WLAN][SHARP] 2014.02.27 Correspondence that can not be the WLAN device Off Start */
-			penv->boot_mode = sh_boot_get_bootmode();
-			if (penv->boot_mode == SH_BOOT_D || penv->boot_mode == SH_BOOT_F_F) {
-				wakeup_source_init(&penv->wcnss_dev_wake_lock, "wcnss_dev");
-				__pm_stay_awake(&penv->wcnss_dev_wake_lock);
-			}
-/* [WLAN][SHARP] 2014.02.27 Correspondence that can not be the WLAN device Off  End  */
 			ret = wcnss_wlan_power(&pdev->dev, pwlanconfig,
 					       WCNSS_WLAN_SWITCH_ON, &xo_mode);
 			wcnss_set_iris_xo_mode(xo_mode);
@@ -3490,12 +3450,6 @@ static int wcnss_notif_cb(struct notifier_block *this, unsigned long code,
 			msleep(20);
 			wcnss_wlan_power(&pdev->dev, pwlanconfig,
 					 WCNSS_WLAN_SWITCH_OFF, NULL);
-/* [WLAN][SHARP] 2014.02.27 Correspondence that can not be the WLAN device Off Start */
-			if (penv->boot_mode == SH_BOOT_D || penv->boot_mode == SH_BOOT_F_F) {
-				__pm_relax(&penv->wcnss_dev_wake_lock);
-				wakeup_source_trash(&penv->wcnss_dev_wake_lock);
-			}
-/* [WLAN][SHARP] 2014.02.27 Correspondence that can not be the WLAN device Off  End  */
 		}
 	} else if ((code == SUBSYS_BEFORE_SHUTDOWN && data && data->crashed) ||
 			code == SUBSYS_SOC_RESET) {
@@ -3505,22 +3459,9 @@ static int wcnss_notif_cb(struct notifier_block *this, unsigned long code,
 		penv->is_shutdown = 1;
 		wcnss_log_debug_regs_on_bite();
 	} else if (code == SUBSYS_POWERUP_FAILURE) {
-/* [WLAN][SHARP] 2014.02.27 Correspondence that can not be the WLAN device Off Start */
-#if 0 
 		if (pdev && pwlanconfig)
 			wcnss_wlan_power(&pdev->dev, pwlanconfig,
 					 WCNSS_WLAN_SWITCH_OFF, NULL);
-#else
-		if (pdev && pwlanconfig){
-			wcnss_wlan_power(&pdev->dev, pwlanconfig,
-					WCNSS_WLAN_SWITCH_OFF, NULL);
-			if (penv->boot_mode == SH_BOOT_D || penv->boot_mode == SH_BOOT_F_F) {
-				__pm_relax(&penv->wcnss_dev_wake_lock);
-				wakeup_source_trash(&penv->wcnss_dev_wake_lock);
-			}
-		}
-#endif
-/* [WLAN][SHARP] 2014.02.27 Correspondence that can not be the WLAN device Off  End  */
 		wcnss_pronto_log_debug_regs();
 		wcnss_disable_pc_remove_req();
 	} else if (code == SUBSYS_BEFORE_SHUTDOWN) {
@@ -3719,109 +3660,8 @@ static struct platform_driver wcnss_wlan_driver = {
 	.remove	= wcnss_wlan_remove,
 };
 
-/* [WLAN][SHARP-EXT] 2016.2.18 Add "For NV reload" Start */
-int wcnss_is_reset_by_user_in_progress(void){
-	return !!(wcnss_reset_flags & WCNSS_RESET_FLAG_IN_PROGRESS);
-}
-
-EXPORT_SYMBOL(wcnss_is_reset_by_user_in_progress);
-
-static int wcnss_reset_open(struct inode *inode, struct file *filp){
-	return 0;
-}
-
-static int wcnss_reset_release(struct inode *inode, struct file *filp){
-	return 0;
-}
-
-static int do_wcnss_reset(void){
-	int ret = -EIO;
-
-	if(wcnss_reset_flags & WCNSS_RESET_FLAG_READY){
-		wcnss_reset_flags |= WCNSS_RESET_FLAG_IN_PROGRESS;
-		wcnss_reset_flags &= ~WCNSS_RESET_FLAG_RESET_OK;	
-		ret = subsystem_restart(WCNSS_PIL_DEVICE);
-		if(ret){
-			pr_err("subsystem_restart() failed, ret=%d\n", ret);
-			ret = -EIO;
-		}else{
-			/* Wait a maximum of 10s (200ms * 50times) for WCNSS reset OK */
-			int cnt;	
-			ret = -EIO;
-			for(cnt = 0; cnt < 50; cnt++){	
-				msleep(200);
-				if(wcnss_reset_flags & WCNSS_RESET_FLAG_RESET_OK){
-					ret = 0;
-					break;
-				}
-			}
-			if(!(wcnss_reset_flags & WCNSS_RESET_FLAG_RESET_OK)){
-				pr_err("Timeout to waiting for WCNSS reset OK\n");
-			}else{
-				wcnss_reset_flags &= ~WCNSS_RESET_FLAG_RESET_OK;
-			}
-		}
-		wcnss_reset_flags &= ~WCNSS_RESET_FLAG_IN_PROGRESS;
-	}else{
-		pr_err("Not ready for WCNSS reset\n");
-	}
-
-	return ret;
-}
-
-static ssize_t wcnss_reset_write(struct file *fp, const char __user
-			*user_buffer, size_t count, loff_t *position){
-	int ret = -EINVAL;	
-	char magicBuf[16];
-
-	if(count == 14){
-		if(!copy_from_user(magicBuf, user_buffer, 14)){
-			magicBuf[14] = '\0';
-			if(!strcmp(magicBuf, "sh_reset_wcnss")){
-				ret = do_wcnss_reset();
-			}
-		}
-	}
-
-	return ((ret == 0) ? count : ret);
-}
-
-static const struct file_operations wcnss_reset_fops = {
-	.owner          = THIS_MODULE,
-	.open           = wcnss_reset_open,	
-	.release        = wcnss_reset_release,	
-	.write          = wcnss_reset_write,
-};	
-
-static struct miscdevice wcnss_reset = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name = "wcnss_reset",
-	.fops = &wcnss_reset_fops,
-};	
-/* [WLAN][SHARP-EXT] 2016.2.18 Add "For NV reload" End */
-
 static int __init wcnss_wlan_init(void)
 {
-
-/* [WLAN][SHARP] 2015.05.08 Change default SSID of Wi-Fi tethering Start */
-	sharp_smem_common_type *SMemCommAdrP;
-
-	memset(wlanmac_from_smem_buf, 0, 18);
-	wlanmac_from_smem = wlanmac_from_smem_buf;
-	SMemCommAdrP = sh_smem_get_common_address();
-	if(SMemCommAdrP != NULL) {
-		snprintf(wlanmac_from_smem_buf, 18, "%02x:%02x:%02x:%02x:%02x:%02x",
-			(unsigned char)SMemCommAdrP->shdarea_WlanMacAddress[0],
-			(unsigned char)SMemCommAdrP->shdarea_WlanMacAddress[1],
-			(unsigned char)SMemCommAdrP->shdarea_WlanMacAddress[2],
-			(unsigned char)SMemCommAdrP->shdarea_WlanMacAddress[3],
-			(unsigned char)SMemCommAdrP->shdarea_WlanMacAddress[4],
-			(unsigned char)SMemCommAdrP->shdarea_WlanMacAddress[5]);
-		pr_err("wlanmac_from_smem set.\n");
-	} else {
-		snprintf(wlanmac_from_smem_buf, 18, "00:00:00:00:00:00");
-	}
-/* [WLAN][SHARP] 2015.05.08 Change default SSID of Wi-Fi tethering End */
 
 	wcnss_ipc_log = ipc_log_context_create(IPC_NUM_LOG_PAGES, "wcnss", 0);
 	if (!wcnss_ipc_log)
@@ -3831,10 +3671,6 @@ static int __init wcnss_wlan_init(void)
 	platform_driver_register(&wcnss_wlan_ctrl_driver);
 	platform_driver_register(&wcnss_ctrl_driver);
 	register_pm_notifier(&wcnss_pm_notifier);
-/* [WLAN][SHARP-EXT] 2016.2.18 Add "For NV reload" Start */
-	wcnss_reset_flags = 0;
-	misc_register(&wcnss_reset);
-/* [WLAN][SHARP-EXT] 2016.2.18 Add "For NV reload" End */
 
 	return 0;
 }
